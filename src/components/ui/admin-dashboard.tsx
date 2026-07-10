@@ -17,7 +17,7 @@ import {
 	UserPlusIcon,
 	PlusIcon,
 } from 'lucide-react';
-import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin } from '@/app/admin/actions';
+import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission } from '@/app/admin/actions';
 import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessagesView } from './messages-view';
@@ -186,6 +186,12 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [eventMessage, setEventMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 	const [isAddingEvent, setIsAddingEvent] = useState(false);
 
+	// CRUD Modals and Edit States
+	const [editModalType, setEditModalType] = useState<'employee' | 'task' | 'leave' | 'attendance' | 'event' | 'submission' | null>(null);
+	const [editingItem, setEditingItem] = useState<any>(null);
+	const [showAddManualLeave, setShowAddManualLeave] = useState(false);
+	const [showAddManualAttendance, setShowAddManualAttendance] = useState(false);
+
 	const fetchStats = async () => {
 		setIsRefreshing(true);
 		try {
@@ -268,6 +274,139 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 			await fetchSubmissions();
 		}
 		setIsUpdatingStatus(false);
+	};
+
+	// CRUD Handlers
+	const handleDeleteEmployee = async (id: string) => {
+		if (!confirm('Are you sure you want to delete this employee? All related attendance, tasks, leaves, and submissions will also be deleted.')) return;
+		const res = await deleteEmployee(id);
+		if (res.success) {
+			fetchEmployees();
+			fetchStats();
+		} else {
+			alert('Failed to delete employee: ' + res.error);
+		}
+	};
+
+	const handleDeleteTask = async (id: string) => {
+		if (!confirm('Are you sure you want to delete this task?')) return;
+		const res = await deleteTask(id);
+		if (res.success) {
+			fetchTasks();
+			fetchStats();
+		} else {
+			alert('Failed to delete task: ' + res.error);
+		}
+	};
+
+	const handleDeleteLeave = async (id: string) => {
+		if (!confirm('Are you sure you want to delete this leave request?')) return;
+		const res = await deleteLeave(id);
+		if (res.success) {
+			fetchLeaves();
+			fetchStats();
+		} else {
+			alert('Failed to delete leave: ' + res.error);
+		}
+	};
+
+	const handleDeleteAttendance = async (id: string) => {
+		if (!confirm('Are you sure you want to delete this attendance log?')) return;
+		const res = await deleteAttendance(id);
+		if (res.success) {
+			fetchAttendance();
+			fetchStats();
+		} else {
+			alert('Failed to delete attendance: ' + res.error);
+		}
+	};
+
+	const handleDeleteEvent = async (id: string) => {
+		if (!confirm('Are you sure you want to delete this event?')) return;
+		const res = await deleteEvent(id);
+		if (res.success) {
+			fetchEvents();
+			fetchStats();
+		} else {
+			alert('Failed to delete event: ' + res.error);
+		}
+	};
+
+	const handleDeleteWorkSubmission = async (id: string) => {
+		if (!confirm('Are you sure you want to delete this work submission?')) return;
+		const res = await deleteWorkSubmission(id);
+		if (res.success) {
+			fetchSubmissions();
+			fetchStats();
+		} else {
+			alert('Failed to delete work submission: ' + res.error);
+		}
+	};
+
+	const handleSaveEmployeeEdit = async (id: string, updatedData: any) => {
+		const res = await updateEmployee(id, updatedData);
+		if (res.success) {
+			setEditModalType(null);
+			setEditingItem(null);
+			fetchEmployees();
+		} else {
+			alert('Failed to update employee: ' + res.error);
+		}
+	};
+
+	const handleSaveTaskEdit = async (id: string, updatedData: any) => {
+		const res = await updateTask(id, updatedData);
+		if (res.success) {
+			setEditModalType(null);
+			setEditingItem(null);
+			fetchTasks();
+		} else {
+			alert('Failed to update task: ' + res.error);
+		}
+	};
+
+	const handleSaveAttendanceEdit = async (id: string, updatedData: any) => {
+		const res = await updateAttendance(id, updatedData);
+		if (res.success) {
+			setEditModalType(null);
+			setEditingItem(null);
+			fetchAttendance();
+		} else {
+			alert('Failed to update attendance: ' + res.error);
+		}
+	};
+
+	const handleSaveEventEdit = async (id: string, updatedData: any) => {
+		const res = await updateEvent(id, updatedData);
+		if (res.success) {
+			setEditModalType(null);
+			setEditingItem(null);
+			fetchEvents();
+		} else {
+			alert('Failed to update event: ' + res.error);
+		}
+	};
+
+	const handleAddManualLeave = async (data: any) => {
+		const res = await createLeave(data);
+		if (res.success) {
+			setShowAddManualLeave(false);
+			fetchLeaves();
+			fetchStats();
+		} else {
+			alert('Failed to log leave request: ' + res.error);
+		}
+	};
+
+	const handleAddManualAttendance = async (data: any) => {
+		const res = await createAttendance(data);
+		if (res.success) {
+			setShowAddManualAttendance(false);
+			fetchAttendance();
+			fetchStats();
+		} else {
+			alert('Failed to log attendance: ' + res.error);
+		}
 	};
 
 	// Leads State
@@ -615,10 +754,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	}
 
 	return (
-		<main className={cn(
-			"bg-zinc-950 text-white relative flex flex-col font-sans",
-			activeTab === 'messages' ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto"
-		)}>
+		<main className="bg-zinc-950 text-white relative flex flex-col font-sans h-screen overflow-hidden">
 			{/* Premium background radial glow */}
 			<div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.03),transparent_70%)] z-0 pointer-events-none" />
 
@@ -627,11 +763,6 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 				<div className="w-full px-6 md:px-10 h-20 flex items-center justify-between">
 					<div className="flex items-center gap-4">
 						<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-8 w-auto object-contain" />
-						<div className="w-px h-7 bg-zinc-800" />
-						<div className="flex flex-col justify-center">
-							<p className="text-[10px] text-brand-400 font-bold uppercase tracking-wider leading-none mb-0.5">{organizationName}</p>
-							<p className="text-xs text-zinc-400 leading-tight">{email}</p>
-						</div>
 					</div>
 					<div className="flex items-center gap-3">
 						<button 
@@ -678,7 +809,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							onClick={() => setActiveTab('task_allocation')}
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'task_allocation' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
-							Task/Work Allocation
+							Tasks
 						</button>
 					)}
 					{(isSuperAdmin || allowedTabs.includes('attendance')) && (
@@ -689,7 +820,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							}}
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'attendance' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
-							Attendance Logs
+							Attendance
 						</button>
 					)}
 					{(isSuperAdmin || allowedTabs.includes('leaves')) && (
@@ -724,7 +855,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							onClick={() => setActiveTab('system_status')}
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'system_status' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
-							System Status
+							System
 						</button>
 					)}
 					{(isSuperAdmin || allowedTabs.includes('events')) && (
@@ -740,7 +871,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							onClick={() => { setActiveTab('work_submissions'); fetchSubmissions(); }}
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'work_submissions' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
-							Work Submissions
+							Submissions
 						</button>
 					)}
 					{(isSuperAdmin || allowedTabs.includes('leads')) && (
@@ -756,7 +887,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							onClick={() => { setActiveTab('super_admin'); fetchAdmins(); }}
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'super_admin' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
-							Super Admin
+							Admins
 						</button>
 					)}
 				</div>
@@ -764,8 +895,8 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 
 			{/* Main Dashboard Content Area */}
 			<div className={cn(
-				"flex-1 w-full relative z-10",
-				activeTab === 'messages' ? "h-[calc(100vh-128px)] flex flex-col" : "max-w-[90rem] mx-auto p-6 md:p-10 space-y-8"
+				"flex-1 w-full relative z-10 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800",
+				activeTab === 'messages' ? "h-[calc(100vh-128px)] flex flex-col overflow-hidden" : "max-w-[90rem] mx-auto p-6 md:p-10 space-y-8"
 			)}>
 
 				{/* Tab content: Overview */}
@@ -857,13 +988,91 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							<h3 className="text-sm font-semibold text-white uppercase tracking-wider">
 								Employee Leaves Directory
 							</h3>
-							<button 
-								onClick={fetchLeaves}
-								className="p-1 border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-850 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all rounded-none cursor-pointer"
-							>
-								<RefreshCwIcon className="size-3.5" />
-							</button>
+							<div className="flex items-center gap-2">
+								<button 
+									onClick={() => setShowAddManualLeave(!showAddManualLeave)}
+									className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-none cursor-pointer transition-colors"
+								>
+									{showAddManualLeave ? 'Cancel Log' : '+ Log Leave'}
+								</button>
+								<button 
+									onClick={fetchLeaves}
+									className="p-1.5 border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-850 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all rounded-none cursor-pointer"
+								>
+									<RefreshCwIcon className="size-3.5" />
+								</button>
+							</div>
 						</div>
+
+						{/* Manual Leave Form */}
+						{showAddManualLeave && (
+							<form 
+								onSubmit={async (e) => {
+									e.preventDefault();
+									const target = e.currentTarget;
+									const empId = target.employeeId.value;
+									const emp = employeesList.find(x => x.id === empId);
+									if (!emp) return alert('Please select a valid employee.');
+									await handleAddManualLeave({
+										employeeId: emp.id,
+										employeeName: `${emp.firstName} ${emp.lastName}`,
+										startDate: target.startDate.value,
+										endDate: target.endDate.value,
+										type: target.type.value,
+										reason: target.reason.value,
+										status: target.status.value,
+									});
+								}} 
+								className="bg-zinc-900/40 border border-zinc-800 p-5 space-y-4 rounded-none"
+							>
+								<h4 className="text-xs font-bold text-white uppercase tracking-wider">Log Leave Manually</h4>
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Select Employee</label>
+										<select name="employeeId" required className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 outline-none">
+											<option value="">-- Choose Employee --</option>
+											{employeesList.map(e => (
+												<option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.id})</option>
+											))}
+										</select>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Leave Type</label>
+										<select name="type" required className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 outline-none">
+											<option value="Sick Leave">Sick Leave</option>
+											<option value="Casual Leave">Casual Leave</option>
+											<option value="Paid Leave">Paid Leave</option>
+											<option value="Unpaid Leave">Unpaid Leave</option>
+										</select>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Status</label>
+										<select name="status" required className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 outline-none">
+											<option value="Approved">Approved</option>
+											<option value="Pending">Pending</option>
+											<option value="Cancelled">Cancelled</option>
+										</select>
+									</div>
+								</div>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Start Date</label>
+										<Input type="date" name="startDate" required className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">End Date</label>
+										<Input type="date" name="endDate" required className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+									</div>
+								</div>
+								<div className="space-y-1">
+									<label className="text-[10px] text-zinc-400 uppercase font-medium">Reason Description</label>
+									<textarea name="reason" required rows={2} className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none p-2 outline-none focus:border-zinc-700 placeholder:text-zinc-650" placeholder="Provide details..."></textarea>
+								</div>
+								<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-none cursor-pointer">
+									Save Leave Log
+								</Button>
+							</form>
+						)}
 
 						{leavesList.length === 0 ? (
 							<div className="min-h-[200px] flex items-center justify-center text-zinc-500 italic text-sm">
@@ -907,52 +1116,61 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 														{leave.status}
 													</span>
 												</td>
-												<td className="p-3 text-right whitespace-nowrap">
-													{leave.status === 'Pending' ? (
-														<div className="inline-flex gap-1.5">
-															<button
-																onClick={async () => {
-																	try {
-																		await updateLeaveStatus(leave.id, 'Approved');
-																		fetchLeaves();
-																	} catch (err) {
-																		console.error("Failed to approve leave", err);
-																	}
-																}}
-																className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
-															>
-																Approve
-															</button>
-															<button
-																onClick={async () => {
-																	try {
-																		await updateLeaveStatus(leave.id, 'Ignored');
-																		fetchLeaves();
-																	} catch (err) {
-																		console.error("Failed to ignore leave", err);
-																	}
-																}}
-																className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
-															>
-																Ignore
-															</button>
-															<button
-																onClick={async () => {
-																	try {
-																		await updateLeaveStatus(leave.id, 'Cancelled');
-																		fetchLeaves();
-																	} catch (err) {
-																		console.error("Failed to cancel leave", err);
-																	}
-																}}
-																className="bg-red-600 hover:bg-red-500 text-white font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
-															>
-																Cancel
-															</button>
-														</div>
-													) : (
-														<span className="text-[10px] text-zinc-500 italic font-medium">Processed</span>
-													)}
+												<td className="p-3 text-right">
+													<div className="flex items-center justify-end gap-2.5">
+														{leave.status === 'Pending' ? (
+															<div className="inline-flex gap-1.5">
+																<button
+																	onClick={async () => {
+																		try {
+																			await updateLeaveStatus(leave.id, 'Approved');
+																			fetchLeaves();
+																		} catch (err) {
+																			console.error("Failed to approve leave", err);
+																		}
+																	}}
+																	className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
+																>
+																	Approve
+																</button>
+																<button
+																	onClick={async () => {
+																		try {
+																			await updateLeaveStatus(leave.id, 'Ignored');
+																			fetchLeaves();
+																		} catch (err) {
+																			console.error("Failed to ignore leave", err);
+																		}
+																	}}
+																	className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
+																>
+																	Ignore
+																</button>
+																<button
+																	onClick={async () => {
+																		try {
+																			await updateLeaveStatus(leave.id, 'Cancelled');
+																			fetchLeaves();
+																		} catch (err) {
+																			console.error("Failed to cancel leave", err);
+																		}
+																	}}
+																	className="bg-red-600 hover:bg-red-500 text-white font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
+																>
+																	Cancel
+																</button>
+															</div>
+														) : (
+															<span className="text-[10px] text-zinc-555 italic">Processed</span>
+														)}
+														<button
+															onClick={() => handleDeleteLeave(leave.id)}
+															className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer ml-1.5"
+															title="Delete Leave Request"
+														>
+															Delete
+														</button>
+													</div>
 												</td>
 											</tr>
 										))}
@@ -970,13 +1188,80 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							<h3 className="text-sm font-semibold text-white uppercase tracking-wider">
 								Employee Attendance Logs
 							</h3>
-							<button 
-								onClick={fetchAttendance}
-								className="p-1 border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-850 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all rounded-none cursor-pointer"
-							>
-								<RefreshCwIcon className="size-3.5" />
-							</button>
+							<div className="flex items-center gap-2">
+								<button 
+									onClick={() => setShowAddManualAttendance(!showAddManualAttendance)}
+									className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-1.5 rounded-none cursor-pointer transition-colors"
+								>
+									{showAddManualAttendance ? 'Cancel Log' : '+ Log Attendance'}
+								</button>
+								<button 
+									onClick={fetchAttendance}
+									className="p-1.5 border border-zinc-800 bg-zinc-900/20 hover:bg-zinc-850 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all rounded-none cursor-pointer"
+								>
+									<RefreshCwIcon className="size-3.5" />
+								</button>
+							</div>
 						</div>
+
+						{/* Manual Attendance Form */}
+						{showAddManualAttendance && (
+							<form 
+								onSubmit={async (e) => {
+									e.preventDefault();
+									const target = e.currentTarget;
+									const empId = target.employeeId.value;
+									const emp = employeesList.find(x => x.id === empId);
+									if (!emp) return alert('Please select a valid employee.');
+									await handleAddManualAttendance({
+										employeeId: emp.id,
+										employeeName: `${emp.firstName} ${emp.lastName}`,
+										date: target.date.value,
+										checkIn: target.checkIn.value,
+										checkOut: target.checkOut.value || undefined,
+										status: target.status.value,
+									});
+								}} 
+								className="bg-zinc-900/40 border border-zinc-800 p-5 space-y-4 rounded-none"
+							>
+								<h4 className="text-xs font-bold text-white uppercase tracking-wider">Log Attendance Manually</h4>
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Select Employee</label>
+										<select name="employeeId" required className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 outline-none">
+											<option value="">-- Choose Employee --</option>
+											{employeesList.map(e => (
+												<option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.id})</option>
+											))}
+										</select>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Date</label>
+										<Input type="text" name="date" required placeholder="YYYY-MM-DD" className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Status</label>
+										<select name="status" required className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 outline-none">
+											<option value="Present">Present</option>
+											<option value="Checked In">Checked In</option>
+										</select>
+									</div>
+								</div>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Check-In Time</label>
+										<Input type="text" name="checkIn" placeholder="e.g. 09:30 AM" required className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Check-Out Time (Optional)</label>
+										<Input type="text" name="checkOut" placeholder="e.g. 06:30 PM" className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+									</div>
+								</div>
+								<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-none cursor-pointer">
+									Save Attendance Log
+								</Button>
+							</form>
+						)}
 
 						{attendanceList.length === 0 ? (
 							<div className="min-h-[200px] flex items-center justify-center text-zinc-500 italic text-sm">
@@ -992,6 +1277,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 											<th className="p-3">Check-In Time</th>
 											<th className="p-3">Check-Out Time</th>
 											<th className="p-3">Status</th>
+											<th className="p-3 text-right">Actions</th>
 										</tr>
 									</thead>
 									<tbody className="divide-y divide-zinc-800/50 text-zinc-300 font-mono">
@@ -1012,6 +1298,23 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 													)}>
 														{log.status}
 													</span>
+												</td>
+												<td className="p-3 text-right whitespace-nowrap space-x-3">
+													<button
+														onClick={() => {
+															setEditingItem(log);
+															setEditModalType('attendance');
+														}}
+														className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
+													>
+														Edit
+													</button>
+													<button
+														onClick={() => handleDeleteAttendance(log.id)}
+														className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+													>
+														Delete
+													</button>
 												</td>
 											</tr>
 										))}
@@ -1303,6 +1606,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 												<th className="p-3">Mode</th>
 												<th className="p-3">Status</th>
 												<th className="p-3">Allocated At</th>
+												<th className="p-3 text-right">Actions</th>
 											</tr>
 										</thead>
 										<tbody className="divide-y divide-zinc-800/50 font-sans text-zinc-300">
@@ -1358,6 +1662,23 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 													</td>
 													<td className="p-3 text-zinc-500 font-mono text-[10px] whitespace-nowrap">
 														{new Date(task.createdAt).toLocaleString()}
+													</td>
+													<td className="p-3 text-right whitespace-nowrap space-x-3">
+														<button
+															onClick={() => {
+																setEditingItem(task);
+																setEditModalType('task');
+															}}
+															className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
+														>
+															Edit
+														</button>
+														<button
+															onClick={() => handleDeleteTask(task.id)}
+															className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+														>
+															Delete
+														</button>
 													</td>
 												</tr>
 											))}
@@ -1513,7 +1834,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 
 						{/* Employee List Table */}
 						<div className="bg-zinc-900/30 border border-zinc-800 overflow-x-auto rounded-none">
-							<table className="w-full text-left text-xs text-zinc-300 font-mono">
+							<table className="w-full min-w-[1200px] text-left text-xs text-zinc-300 font-mono">
 								<thead className="bg-zinc-950/70 border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-wider">
 									<tr>
 										<th className="p-4 font-semibold">Employee ID</th>
@@ -1523,12 +1844,13 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										<th className="p-4 font-semibold">Wing</th>
 										<th className="p-4 font-semibold">Wing Lead</th>
 										<th className="p-4 font-semibold">Role</th>
+										<th className="p-4 font-semibold text-right">Actions</th>
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-zinc-850 bg-zinc-950/10">
 									{employeesList.length === 0 ? (
 										<tr>
-											<td colSpan={7} className="p-8 text-center text-zinc-550 text-xs italic font-sans">
+											<td colSpan={8} className="p-8 text-center text-zinc-550 text-xs italic font-sans">
 												No employees registered in directory. Click "Add New Employee" to get started.
 											</td>
 										</tr>
@@ -1544,6 +1866,23 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 												<td className="p-4 text-zinc-200">{emp.wingName}</td>
 												<td className="p-4 text-zinc-200">{emp.wingLeadName}</td>
 												<td className="p-4 text-zinc-200">{emp.role || 'Employee'}</td>
+												<td className="p-4 text-right space-x-3">
+													<button
+														onClick={() => {
+															setEditingItem(emp);
+															setEditModalType('employee');
+														}}
+														className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
+													>
+														Edit
+													</button>
+													<button
+														onClick={() => handleDeleteEmployee(emp.id)}
+														className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+													>
+														Delete
+													</button>
+												</td>
 											</tr>
 										))
 									)}
@@ -1766,6 +2105,24 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 													</div>
 												</div>
 											)}
+
+											<div className="flex justify-end gap-3.5 pt-3 border-t border-zinc-800/40">
+												<button
+													onClick={() => {
+														setEditingItem(event);
+														setEditModalType('event');
+													}}
+													className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
+												>
+													Edit
+												</button>
+												<button
+													onClick={() => handleDeleteEvent(event.id)}
+													className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+												>
+													Delete
+												</button>
+											</div>
 										</div>
 									);
 								})}
@@ -1914,12 +2271,18 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 														</div>
 													</div>
 												) : (
-													<div className="pt-1">
+													<div className="pt-1 flex items-center justify-between">
 														<button
 															onClick={() => { setReviewingId(sub.id); setReviewNote(sub.adminNote || ''); }}
 															className="text-xs text-brand-400 hover:text-brand-300 cursor-pointer transition-colors font-medium"
 														>
 															Review →
+														</button>
+														<button
+															onClick={() => handleDeleteWorkSubmission(sub.id)}
+															className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+														>
+															Delete
 														</button>
 													</div>
 												)}
@@ -2695,6 +3058,298 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 				)}
 
 			</div>
+
+			{/* CRUD Edit Modals */}
+			{editModalType && editingItem && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-sm p-4">
+					<div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 p-6 space-y-4 shadow-2xl relative">
+						<div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+							<h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+								Edit {editModalType === 'employee' ? 'Employee Profile' : editModalType === 'task' ? 'Task Allocation' : editModalType === 'attendance' ? 'Attendance Log' : 'Event Details'}
+							</h3>
+							<button 
+								onClick={() => { setEditModalType(null); setEditingItem(null); }}
+								className="text-zinc-400 hover:text-white font-semibold text-sm cursor-pointer"
+							>
+								✕
+							</button>
+						</div>
+
+						{/* Employee Edit Form */}
+						{editModalType === 'employee' && (
+							<form 
+								onSubmit={async (e) => {
+									e.preventDefault();
+									const formData = new FormData(e.currentTarget);
+									await handleSaveEmployeeEdit(editingItem.id, {
+										firstName: formData.get('firstName') as string,
+										middleName: formData.get('middleName') as string,
+										lastName: formData.get('lastName') as string,
+										email: formData.get('email') as string,
+										phone: formData.get('phone') as string,
+										wingName: formData.get('wingName') as string,
+										wingLeadName: formData.get('wingLeadName') as string,
+										role: formData.get('role') as string
+									});
+								}}
+								className="space-y-4"
+							>
+								<div className="grid grid-cols-3 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">First Name</label>
+										<Input name="firstName" defaultValue={editingItem.firstName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Middle Name</label>
+										<Input name="middleName" defaultValue={editingItem.middleName || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Last Name</label>
+										<Input name="lastName" defaultValue={editingItem.lastName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Email</label>
+										<Input type="email" name="email" defaultValue={editingItem.email} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Phone</label>
+										<Input name="phone" defaultValue={editingItem.phone} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+								</div>
+								<div className="grid grid-cols-3 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Wing Name</label>
+										<Input name="wingName" defaultValue={editingItem.wingName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Wing Lead</label>
+										<Input name="wingLeadName" defaultValue={editingItem.wingLeadName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Role</label>
+										<Input name="role" defaultValue={editingItem.role || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+								</div>
+								<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+									<Button type="button" variant="outline" onClick={() => { setEditModalType(null); setEditingItem(null); }} className="text-xs rounded-none h-9 cursor-pointer border-zinc-800 text-zinc-300">Cancel</Button>
+									<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-none h-9 text-white cursor-pointer">Save Changes</Button>
+								</div>
+							</form>
+						)}
+
+						{/* Task Edit Form */}
+						{editModalType === 'task' && (
+							<form 
+								onSubmit={async (e) => {
+									e.preventDefault();
+									const formData = new FormData(e.currentTarget);
+									const assignId = formData.get('assigneeId') as string;
+									let assignName = 'ALL MEMBERS';
+									if (assignId !== 'ALL') {
+										const matched = employeesList.find(x => x.id === assignId);
+										if (matched) assignName = `${matched.firstName} ${matched.lastName}`;
+									}
+									await handleSaveTaskEdit(editingItem.id, {
+										title: formData.get('title') as string,
+										description: formData.get('description') as string,
+										reportTo: formData.get('reportTo') as string,
+										assigneeId: assignId,
+										assigneeName: assignName,
+										deadline: formData.get('deadline') as string,
+										status: formData.get('status') as string,
+										mode: formData.get('mode') as string
+									});
+								}}
+								className="space-y-4"
+							>
+								<div className="grid grid-cols-2 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Task Title</label>
+										<Input name="title" defaultValue={editingItem.title} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Report To</label>
+										<Input name="reportTo" defaultValue={editingItem.reportTo} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+								</div>
+								<div className="space-y-1">
+									<label className="text-[10px] text-zinc-400 uppercase font-medium">Task Description</label>
+									<textarea name="description" defaultValue={editingItem.description} required rows={3} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white p-2.5 rounded-none outline-none focus:border-zinc-700" />
+								</div>
+								<div className="grid grid-cols-3 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Assign To</label>
+										<select name="assigneeId" defaultValue={editingItem.assigneeId} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white h-9 px-2 outline-none">
+											<option value="ALL">ALL MEMBERS</option>
+											{employeesList.map(e => (
+												<option key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.id})</option>
+											))}
+										</select>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Deadline Date</label>
+										<Input type="date" name="deadline" defaultValue={new Date(editingItem.deadline).toISOString().split('T')[0]} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Mode</label>
+										<select name="mode" defaultValue={editingItem.mode} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white h-9 px-2 outline-none">
+											<option value="Onsite">Onsite</option>
+											<option value="Remote">Remote</option>
+											<option value="Hybrid">Hybrid</option>
+										</select>
+									</div>
+								</div>
+								<div className="space-y-1">
+									<label className="text-[10px] text-zinc-400 uppercase font-medium">Status</label>
+									<select name="status" defaultValue={editingItem.status} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white h-9 px-2 outline-none">
+										<option value="Pending">Pending</option>
+										<option value="In Progress">In Progress</option>
+										<option value="Completed">Completed</option>
+									</select>
+								</div>
+								<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+									<Button type="button" variant="outline" onClick={() => { setEditModalType(null); setEditingItem(null); }} className="text-xs rounded-none h-9 cursor-pointer border-zinc-800 text-zinc-300">Cancel</Button>
+									<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-none h-9 text-white cursor-pointer">Save Changes</Button>
+								</div>
+							</form>
+						)}
+
+						{/* Attendance Edit Form */}
+						{editModalType === 'attendance' && (
+							<form 
+								onSubmit={async (e) => {
+									e.preventDefault();
+									const formData = new FormData(e.currentTarget);
+									await handleSaveAttendanceEdit(editingItem.id, {
+										date: formData.get('date') as string,
+										checkIn: formData.get('checkIn') as string,
+										checkOut: (formData.get('checkOut') as string) || undefined,
+										status: formData.get('status') as string
+									});
+								}}
+								className="space-y-4"
+							>
+								<div className="grid grid-cols-2 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Date</label>
+										<Input name="date" defaultValue={editingItem.date} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Status</label>
+										<select name="status" defaultValue={editingItem.status} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white h-9 px-2 outline-none">
+											<option value="Present">Present</option>
+											<option value="Checked In">Checked In</option>
+										</select>
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Check-In Time</label>
+										<Input name="checkIn" defaultValue={editingItem.checkIn} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Check-Out Time (Optional)</label>
+										<Input name="checkOut" defaultValue={editingItem.checkOut || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+								</div>
+								<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+									<Button type="button" variant="outline" onClick={() => { setEditModalType(null); setEditingItem(null); }} className="text-xs rounded-none h-9 cursor-pointer border-zinc-800 text-zinc-300">Cancel</Button>
+									<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-none h-9 text-white cursor-pointer">Save Changes</Button>
+								</div>
+							</form>
+						)}
+
+						{/* Event Edit Form */}
+						{editModalType === 'event' && (() => {
+							const repsParsed = JSON.parse(editingItem.representatives || '[]');
+							const initialReps = ['', '', '', '', ''];
+							repsParsed.forEach((r: any, idx: number) => {
+								if (idx < 5) initialReps[idx] = r.name;
+							});
+							return (
+								<form 
+									onSubmit={async (e) => {
+										e.preventDefault();
+										const formData = new FormData(e.currentTarget);
+										const repsList: { id: string; name: string }[] = [];
+										for (let i = 1; i <= 5; i++) {
+											const val = formData.get(`rep${i}`) as string;
+											if (val && val.trim()) {
+												repsList.push({ id: `rep_${i}_${Date.now()}`, name: val.trim() });
+											}
+										}
+										await handleSaveEventEdit(editingItem.id, {
+											title: formData.get('title') as string,
+											description: formData.get('description') as string,
+											organisingCollege: formData.get('organisingCollege') as string,
+											representatives: repsList,
+											startDate: formData.get('startDate') as string,
+											endDate: formData.get('endDate') as string,
+											startTime: formData.get('startTime') as string,
+											endTime: formData.get('endTime') as string,
+											venueAddress: formData.get('venueAddress') as string,
+										});
+									}}
+									className="space-y-4 max-h-[75vh] overflow-y-auto pr-1"
+								>
+									<div className="grid grid-cols-2 gap-2">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-400 uppercase font-medium">Event Title</label>
+											<Input name="title" defaultValue={editingItem.title} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-400 uppercase font-medium">Organising College</label>
+											<Input name="organisingCollege" defaultValue={editingItem.organisingCollege} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+										</div>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Description</label>
+										<textarea name="description" defaultValue={editingItem.description} required rows={2} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white p-2 outline-none focus:border-zinc-700 placeholder:text-zinc-650 rounded-none" />
+									</div>
+									<div className="grid grid-cols-2 gap-2">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-400 uppercase font-medium">Start Date</label>
+											<Input type="date" name="startDate" defaultValue={new Date(editingItem.startDate).toISOString().split('T')[0]} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-400 uppercase font-medium">End Date</label>
+											<Input type="date" name="endDate" defaultValue={new Date(editingItem.endDate).toISOString().split('T')[0]} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+										</div>
+									</div>
+									<div className="grid grid-cols-2 gap-2">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-400 uppercase font-medium">Start Time</label>
+											<Input type="time" name="startTime" defaultValue={editingItem.startTime} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-400 uppercase font-medium">End Time</label>
+											<Input type="time" name="endTime" defaultValue={editingItem.endTime} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+										</div>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Venue Address</label>
+										<Input name="venueAddress" defaultValue={editingItem.venueAddress} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1.5">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Company Representatives (up to 5)</label>
+										<div className="grid grid-cols-2 gap-2">
+											{initialReps.map((r, idx) => (
+												<Input key={idx} name={`rep${idx+1}`} defaultValue={r} placeholder={`Rep ${idx+1} name`} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+											))}
+										</div>
+									</div>
+									<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+										<Button type="button" variant="outline" onClick={() => { setEditModalType(null); setEditingItem(null); }} className="text-xs rounded-none h-9 cursor-pointer border-zinc-800 text-zinc-300">Cancel</Button>
+										<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-none h-9 text-white cursor-pointer">Save Changes</Button>
+									</div>
+								</form>
+							);
+						})()}
+					</div>
+				</div>
+			)}
 		</main>
 	);
 }

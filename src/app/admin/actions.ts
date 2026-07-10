@@ -1358,3 +1358,243 @@ export async function createManualLead(data: {
     return { success: false, error: error.message };
   }
 }
+
+export async function deleteEmployee(id: string) {
+  try {
+    await db.attendance.deleteMany({ where: { employeeId: id } });
+    await db.leave.deleteMany({ where: { employeeId: id } });
+    await db.channelAccessRequest.deleteMany({ where: { employeeId: id } });
+    await db.workSubmission.deleteMany({ where: { employeeId: id } });
+    await db.lead.updateMany({
+      where: { assignedTo: id },
+      data: { assignedTo: null }
+    });
+    await db.employee.delete({ where: { id } });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting employee:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateEmployee(id: string, data: {
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  wingName: string;
+  wingLeadName: string;
+  role?: string;
+}) {
+  try {
+    const updated = await db.employee.update({
+      where: { id },
+      data: {
+        firstName: data.firstName,
+        middleName: data.middleName || null,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        wingName: data.wingName,
+        wingLeadName: data.wingLeadName,
+        role: data.role || "Employee",
+      }
+    });
+    return { success: true, employee: updated };
+  } catch (error: any) {
+    console.error('Error updating employee:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteTask(id: string) {
+  try {
+    await db.task.delete({ where: { id } });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting task:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateTask(id: string, data: {
+  title: string;
+  description: string;
+  reportTo: string;
+  assigneeId: string;
+  assigneeName: string;
+  deadline: string;
+  status: string;
+  mode: string;
+}) {
+  try {
+    const updated = await db.task.update({
+      where: { id },
+      data: {
+        title: data.title,
+        description: data.description,
+        reportTo: data.reportTo,
+        assigneeId: data.assigneeId,
+        assigneeName: data.assigneeName,
+        deadline: new Date(data.deadline),
+        status: data.status,
+        mode: data.mode,
+      }
+    });
+    return { success: true, task: updated };
+  } catch (error: any) {
+    console.error('Error updating task:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteLeave(id: string) {
+  try {
+    await db.leave.delete({ where: { id } });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting leave:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createLeave(data: {
+  employeeId: string;
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  type: string;
+  reason: string;
+  status?: string;
+}) {
+  try {
+    const leave = await db.leave.create({
+      data: {
+        employeeId: data.employeeId,
+        employeeName: data.employeeName,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        type: data.type,
+        reason: data.reason,
+        status: data.status || 'Pending'
+      }
+    });
+    return { success: true, leave };
+  } catch (error: any) {
+    console.error('Error creating leave:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteAttendance(id: string) {
+  try {
+    await db.attendance.delete({ where: { id } });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting attendance:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createAttendance(data: {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  checkIn: string;
+  checkOut?: string;
+  status: string;
+}) {
+  try {
+    const attendance = await db.attendance.create({
+      data: {
+        employeeId: data.employeeId,
+        employeeName: data.employeeName,
+        date: data.date,
+        checkIn: data.checkIn,
+        checkOut: data.checkOut || null,
+        status: data.status,
+      }
+    });
+    return { success: true, attendance };
+  } catch (error: any) {
+    console.error('Error creating attendance:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateAttendance(id: string, data: {
+  date: string;
+  checkIn: string;
+  checkOut?: string;
+  status: string;
+}) {
+  try {
+    const updated = await db.attendance.update({
+      where: { id },
+      data: {
+        date: data.date,
+        checkIn: data.checkIn,
+        checkOut: data.checkOut || null,
+        status: data.status
+      }
+    });
+    return { success: true, attendance: updated };
+  } catch (error: any) {
+    console.error('Error updating attendance:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteEvent(id: string) {
+  try {
+    await db.event.delete({ where: { id } });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting event:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateEvent(id: string, data: {
+  title: string;
+  description: string;
+  organisingCollege: string;
+  representatives: { id: string; name: string }[];
+  startDate: string;
+  endDate: string;
+  startTime: string;
+  endTime: string;
+  venueAddress: string;
+}) {
+  try {
+    const updated = await db.event.update({
+      where: { id },
+      data: {
+        title: data.title,
+        description: data.description,
+        organisingCollege: data.organisingCollege,
+        representatives: JSON.stringify(data.representatives) as any,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        startTime: data.startTime,
+        endTime: data.endTime,
+        venueAddress: data.venueAddress,
+      }
+    });
+    return { success: true, event: updated };
+  } catch (error: any) {
+    console.error('Error updating event:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteWorkSubmission(id: string) {
+  try {
+    await db.workSubmission.delete({ where: { id } });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error deleting work submission:', error);
+    return { success: false, error: error.message };
+  }
+}
