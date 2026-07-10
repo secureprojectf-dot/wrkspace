@@ -11,7 +11,9 @@ import {
 	CircleIcon,
 	RefreshCwIcon,
 	ArrowLeftIcon,
-	ShieldAlertIcon
+	ShieldAlertIcon,
+	CheckIcon,
+	XIcon
 } from 'lucide-react';
 import { Button } from './button';
 import { Input } from './input';
@@ -494,15 +496,17 @@ export function MessagesView({ currentUser }: MessagesViewProps) {
 									<div className="flex gap-2">
 										<button
 											onClick={() => handleApproveRequest(req.id)}
-											className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] uppercase font-mono cursor-pointer transition-colors"
+											className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer transition-colors"
+											title="Approve Request"
 										>
-											Approve
+											<CheckIcon className="size-3.5" />
 										</button>
 										<button
 											onClick={() => handleRejectRequest(req.id)}
-											className="px-2.5 py-1 bg-red-650/80 hover:bg-red-500 text-white font-bold text-[10px] uppercase font-mono cursor-pointer transition-colors"
+											className="p-1.5 bg-red-650/80 hover:bg-red-500 text-white cursor-pointer transition-colors"
+											title="Decline Request"
 										>
-											Decline
+											<XIcon className="size-3.5" />
 										</button>
 									</div>
 								</div>

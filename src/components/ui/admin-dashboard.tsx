@@ -18,7 +18,7 @@ import {
 	PlusIcon,
 } from 'lucide-react';
 import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission } from '@/app/admin/actions';
-import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon } from 'lucide-react';
+import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon, PencilIcon, CheckIcon, XIcon, EyeIcon, CopyIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessagesView } from './messages-view';
 
@@ -763,6 +763,8 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 				<div className="w-full px-6 md:px-10 h-20 flex items-center justify-between">
 					<div className="flex items-center gap-4">
 						<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-8 w-auto object-contain" />
+						<div className="w-px h-6 bg-zinc-800" />
+						<span className="text-sm font-semibold tracking-wider text-zinc-400 uppercase font-mono">Admin</span>
 					</div>
 					<div className="flex items-center gap-3">
 						<button 
@@ -1117,7 +1119,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 													</span>
 												</td>
 												<td className="p-3 text-right">
-													<div className="flex items-center justify-end gap-2.5">
+													<div className="flex items-center justify-end gap-2">
 														{leave.status === 'Pending' ? (
 															<div className="inline-flex gap-1.5">
 																<button
@@ -1129,9 +1131,10 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 																			console.error("Failed to approve leave", err);
 																		}
 																	}}
-																	className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
+																	className="p-1.5 bg-emerald-950/40 border border-emerald-800 text-emerald-400 hover:bg-emerald-900/40 cursor-pointer"
+																	title="Approve Leave"
 																>
-																	Approve
+																	<CheckIcon className="size-3.5" />
 																</button>
 																<button
 																	onClick={async () => {
@@ -1142,9 +1145,10 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 																			console.error("Failed to ignore leave", err);
 																		}
 																	}}
-																	className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
+																	className="p-1.5 bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-700 cursor-pointer"
+																	title="Ignore Leave"
 																>
-																	Ignore
+																	<EyeIcon className="size-3.5" />
 																</button>
 																<button
 																	onClick={async () => {
@@ -1155,20 +1159,21 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 																			console.error("Failed to cancel leave", err);
 																		}
 																	}}
-																	className="bg-red-600 hover:bg-red-500 text-white font-semibold text-[10px] uppercase py-1 px-2.5 rounded-none cursor-pointer transition-colors"
+																	className="p-1.5 bg-red-955/40 border border-red-900/40 text-red-400 hover:bg-red-900/40 cursor-pointer"
+																	title="Cancel Leave"
 																>
-																	Cancel
+																	<XIcon className="size-3.5" />
 																</button>
 															</div>
 														) : (
-															<span className="text-[10px] text-zinc-555 italic">Processed</span>
+															<span className="text-[10px] text-zinc-555 italic mr-1">Processed</span>
 														)}
 														<button
 															onClick={() => handleDeleteLeave(leave.id)}
-															className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer ml-1.5"
+															className="p-1.5 bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-red-400 hover:text-red-300 transition-all cursor-pointer"
 															title="Delete Leave Request"
 														>
-															Delete
+															<Trash2Icon className="size-3.5" />
 														</button>
 													</div>
 												</td>
@@ -1299,22 +1304,26 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 														{log.status}
 													</span>
 												</td>
-												<td className="p-3 text-right whitespace-nowrap space-x-3">
-													<button
-														onClick={() => {
-															setEditingItem(log);
-															setEditModalType('attendance');
-														}}
-														className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
-													>
-														Edit
-													</button>
-													<button
-														onClick={() => handleDeleteAttendance(log.id)}
-														className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
-													>
-														Delete
-													</button>
+												<td className="p-3 text-right whitespace-nowrap">
+													<div className="inline-flex items-center justify-end gap-2">
+														<button
+															onClick={() => {
+																setEditingItem(log);
+																setEditModalType('attendance');
+															}}
+															className="p-1.5 bg-zinc-900 border border-zinc-800 text-indigo-400 hover:text-indigo-300 hover:border-zinc-700 transition-all cursor-pointer"
+															title="Edit Attendance Log"
+														>
+															<PencilIcon className="size-3.5" />
+														</button>
+														<button
+															onClick={() => handleDeleteAttendance(log.id)}
+															className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:text-red-300 hover:border-zinc-700 transition-all cursor-pointer"
+															title="Delete Attendance Log"
+														>
+															<Trash2Icon className="size-3.5" />
+														</button>
+													</div>
 												</td>
 											</tr>
 										))}
@@ -1663,22 +1672,26 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 													<td className="p-3 text-zinc-500 font-mono text-[10px] whitespace-nowrap">
 														{new Date(task.createdAt).toLocaleString()}
 													</td>
-													<td className="p-3 text-right whitespace-nowrap space-x-3">
-														<button
-															onClick={() => {
-																setEditingItem(task);
-																setEditModalType('task');
-															}}
-															className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
-														>
-															Edit
-														</button>
-														<button
-															onClick={() => handleDeleteTask(task.id)}
-															className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
-														>
-															Delete
-														</button>
+													<td className="p-3 text-right whitespace-nowrap">
+														<div className="inline-flex items-center justify-end gap-2">
+															<button
+																onClick={() => {
+																	setEditingItem(task);
+																	setEditModalType('task');
+																}}
+																className="p-1.5 bg-zinc-900 border border-zinc-800 text-indigo-400 hover:text-indigo-300 hover:border-zinc-700 transition-all cursor-pointer"
+																title="Edit Task"
+															>
+																<PencilIcon className="size-3.5" />
+															</button>
+															<button
+																onClick={() => handleDeleteTask(task.id)}
+																className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:text-red-300 hover:border-zinc-700 transition-all cursor-pointer"
+																title="Delete Task"
+															>
+																<Trash2Icon className="size-3.5" />
+															</button>
+														</div>
 													</td>
 												</tr>
 											))}
@@ -1833,18 +1846,18 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 						)}
 
 						{/* Employee List Table */}
-						<div className="bg-zinc-900/30 border border-zinc-800 overflow-x-auto rounded-none">
-							<table className="w-full min-w-[1200px] text-left text-xs text-zinc-300 font-mono">
+						<div className="bg-zinc-900/30 border border-zinc-800 overflow-x-auto rounded-none w-full scrollbar-thin scrollbar-thumb-zinc-800">
+							<table className="w-full min-w-[1400px] text-left text-xs text-zinc-300 font-mono">
 								<thead className="bg-zinc-950/70 border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-wider">
 									<tr>
-										<th className="p-4 font-semibold">Employee ID</th>
-										<th className="p-4 font-semibold">Full Name</th>
-										<th className="p-4 font-semibold">Email ID</th>
-										<th className="p-4 font-semibold">Phone</th>
-										<th className="p-4 font-semibold">Wing</th>
-										<th className="p-4 font-semibold">Wing Lead</th>
-										<th className="p-4 font-semibold">Role</th>
-										<th className="p-4 font-semibold text-right">Actions</th>
+										<th className="p-4 font-semibold w-32">Employee ID</th>
+										<th className="p-4 font-semibold w-56">Full Name</th>
+										<th className="p-4 font-semibold w-64">Email ID</th>
+										<th className="p-4 font-semibold w-40">Phone</th>
+										<th className="p-4 font-semibold w-40">Wing</th>
+										<th className="p-4 font-semibold w-48">Wing Lead</th>
+										<th className="p-4 font-semibold w-48">Role</th>
+										<th className="p-4 font-semibold text-right w-28">Actions</th>
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-zinc-850 bg-zinc-950/10">
@@ -1861,27 +1874,31 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 												<td className="p-4 text-white font-sans font-medium">
 													{emp.firstName} {emp.middleName ? `${emp.middleName} ` : ''}{emp.lastName}
 												</td>
-												<td className="p-4">{emp.email}</td>
+												<td className="p-4 truncate max-w-[200px]" title={emp.email}>{emp.email}</td>
 												<td className="p-4">{emp.phone}</td>
 												<td className="p-4 text-zinc-200">{emp.wingName}</td>
 												<td className="p-4 text-zinc-200">{emp.wingLeadName}</td>
 												<td className="p-4 text-zinc-200">{emp.role || 'Employee'}</td>
-												<td className="p-4 text-right space-x-3">
-													<button
-														onClick={() => {
-															setEditingItem(emp);
-															setEditModalType('employee');
-														}}
-														className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
-													>
-														Edit
-													</button>
-													<button
-														onClick={() => handleDeleteEmployee(emp.id)}
-														className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
-													>
-														Delete
-													</button>
+												<td className="p-4 text-right">
+													<div className="inline-flex items-center justify-end gap-2">
+														<button
+															onClick={() => {
+																setEditingItem(emp);
+																setEditModalType('employee');
+															}}
+															className="p-1.5 bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-indigo-400 hover:text-indigo-300 transition-all cursor-pointer"
+															title="Edit Employee"
+														>
+															<PencilIcon className="size-3.5" />
+														</button>
+														<button
+															onClick={() => handleDeleteEmployee(emp.id)}
+															className="p-1.5 bg-zinc-900 border border-zinc-850 hover:border-zinc-700 text-red-400 hover:text-red-300 hover:border-zinc-700 transition-all cursor-pointer"
+															title="Delete Employee"
+														>
+															<Trash2Icon className="size-3.5" />
+														</button>
+													</div>
 												</td>
 											</tr>
 										))
@@ -2106,21 +2123,23 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 												</div>
 											)}
 
-											<div className="flex justify-end gap-3.5 pt-3 border-t border-zinc-800/40">
+											<div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/40">
 												<button
 													onClick={() => {
 														setEditingItem(event);
 														setEditModalType('event');
 													}}
-													className="text-indigo-400 hover:text-indigo-300 font-sans font-semibold text-xs cursor-pointer"
+													className="p-1.5 bg-zinc-900 border border-zinc-800 text-indigo-400 hover:text-indigo-300 hover:border-zinc-700 transition-all cursor-pointer"
+													title="Edit Event"
 												>
-													Edit
+													<PencilIcon className="size-3.5" />
 												</button>
 												<button
 													onClick={() => handleDeleteEvent(event.id)}
-													className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+													className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:text-red-300 hover:border-zinc-700 transition-all cursor-pointer"
+													title="Delete Event"
 												>
-													Delete
+													<Trash2Icon className="size-3.5" />
 												</button>
 											</div>
 										</div>
@@ -2271,18 +2290,20 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 														</div>
 													</div>
 												) : (
-													<div className="pt-1 flex items-center justify-between">
+													<div className="pt-1 flex items-center justify-end gap-2">
 														<button
 															onClick={() => { setReviewingId(sub.id); setReviewNote(sub.adminNote || ''); }}
-															className="text-xs text-brand-400 hover:text-brand-300 cursor-pointer transition-colors font-medium"
+															className="p-1.5 bg-zinc-900 border border-zinc-800 text-brand-400 hover:text-brand-300 transition-all cursor-pointer"
+															title="Review Submission"
 														>
-															Review →
+															<PencilIcon className="size-3.5" />
 														</button>
 														<button
 															onClick={() => handleDeleteWorkSubmission(sub.id)}
-															className="text-red-400 hover:text-red-300 font-sans font-semibold text-xs cursor-pointer"
+															className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:text-red-300 transition-all cursor-pointer"
+															title="Delete Submission"
 														>
-															Delete
+															<Trash2Icon className="size-3.5" />
 														</button>
 													</div>
 												)}
@@ -2720,13 +2741,14 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 																	onClick={() => handleLeadAllowToggle(lead.id, !lead.allowed)}
 																	disabled={updatingLeadId === lead.id}
 																	className={cn(
-																		"text-[10px] px-2 py-1 border transition-colors cursor-pointer disabled:opacity-50 font-semibold tracking-wider uppercase font-mono",
+																		"p-1.5 border transition-colors cursor-pointer disabled:opacity-50",
 																		lead.allowed 
 																			? "bg-emerald-950/40 border-emerald-800 text-emerald-400" 
 																			: "bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-white"
 																	)}
+																	title={lead.allowed ? 'Lead Allowed' : 'Allow Lead'}
 																>
-																	{lead.allowed ? 'Allowed' : 'Allow'}
+																	{lead.allowed ? <CheckIcon className="size-3.5" /> : <PlusIcon className="size-3.5" />}
 																</button>
 																<button
 																	onClick={() => handleLeadDelete(lead.id)}
@@ -2811,9 +2833,10 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 																	</span>{' '}
 																	<button
 																		onClick={() => { setAssigningLeadId(lead.id); setAssignEmployeeId(lead.assignedTo || ''); }}
-																		className="text-brand-400 hover:underline ml-1 font-semibold cursor-pointer"
+																		className="text-brand-400 hover:text-brand-300 ml-1 cursor-pointer transition-colors inline-block"
+																		title="Change Assignee"
 																	>
-																		[Change]
+																		<PencilIcon className="size-3 inline" />
 																	</button>
 																</span>
 															)}
@@ -2837,13 +2860,14 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 															onClick={() => handleLeadAllowToggle(lead.id, !lead.allowed)}
 															disabled={updatingLeadId === lead.id}
 															className={cn(
-																"text-[10px] px-2 py-1 border transition-colors cursor-pointer disabled:opacity-50 font-semibold tracking-wider uppercase font-mono",
+																"p-1.5 border transition-colors cursor-pointer disabled:opacity-50",
 																lead.allowed 
 																	? "bg-emerald-950/40 border-emerald-800 text-emerald-400" 
 																	: "bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-white"
 															)}
+															title={lead.allowed ? 'Lead Allowed' : 'Allow Lead'}
 														>
-															{lead.allowed ? 'Allowed' : 'Allow'}
+															{lead.allowed ? <CheckIcon className="size-3.5" /> : <PlusIcon className="size-3.5" />}
 														</button>
 														<button
 															onClick={() => handleLeadDelete(lead.id)}
@@ -3025,22 +3049,24 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 													</td>
 													<td className="p-3 text-right">
 														{adm.email.toLowerCase() !== 'webstrixx@gmail.com' ? (
-															<div className="flex justify-end gap-2">
+															<div className="inline-flex justify-end gap-2">
 																<button
 																	onClick={() => {
 																		const inviteUrl = `${window.location.origin}/admin?invite=${adm.inviteToken}`;
 																		navigator.clipboard.writeText(inviteUrl);
 																		alert('Invite URL copied to clipboard!');
 																	}}
-																	className="text-[10px] text-brand-400 hover:text-brand-300 hover:underline font-semibold"
+																	className="p-1.5 bg-zinc-900 border border-zinc-800 text-brand-400 hover:text-brand-300 hover:border-zinc-700 transition-all cursor-pointer"
+																	title="Copy Invite URL"
 																>
-																	Invite URL
+																	<CopyIcon className="size-3.5" />
 																</button>
 																<button
 																	onClick={() => handleDeleteAdmin(adm.email)}
-																	className="text-[10px] text-red-500 hover:text-red-400 hover:underline font-semibold"
+																	className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-500 hover:text-red-400 hover:border-zinc-700 transition-all cursor-pointer"
+																	title="Revoke Admin Access"
 																>
-																	Revoke
+																	<Trash2Icon className="size-3.5" />
 																</button>
 															</div>
 														) : (
