@@ -431,10 +431,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 					<div className="flex items-center gap-4">
 						<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-8 w-auto object-contain" />
 						<div className="w-px h-7 bg-zinc-800" />
-						<div className="flex flex-col justify-center">
-							<p className="text-xs text-zinc-500 font-medium">Logged in as</p>
-							<p className="text-sm text-white font-semibold leading-tight">{employee.firstName} {employee.lastName} <span className="text-zinc-500 font-normal text-xs">· {employee.id}</span></p>
-						</div>
+						<span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 font-mono">Employee</span>
 					</div>
 					<div className="flex items-center gap-3">
 						<Button 
