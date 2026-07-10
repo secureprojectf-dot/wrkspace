@@ -1,0 +1,148 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider   = "prisma-client-js"
+  output     = "../src/generated/prisma"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Admin {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  password         String    @default("admin123")
+  organizationName String?   @default("My Organization")
+  allowedPages     String?   @default("overview,employees,leaves,attendance,clients,system_status,messages,task_allocation,events,work_submissions,leads")
+  inviteToken      String?   @unique
+  activeOtp        String?
+  otpExpiresAt     DateTime?
+  createdAt        DateTime  @default(now())
+}
+
+model Employee {
+  id           String   @id // 6-digit alphanumeric generated code
+  firstName    String
+  middleName   String?
+  lastName     String
+  email        String   @unique
+  phone        String
+  wingName     String
+  wingLeadName String
+  role         String   @default("Employee")
+  createdAt    DateTime @default(now())
+  password     String?
+  activeOtp    String?
+  otpExpiresAt DateTime?
+}
+
+model Task {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  reportTo     String
+  assigneeId   String   // Employee ID or "ALL"
+  assigneeName String   // Employee Name or "All Employees"
+  deadline     DateTime
+  status       String   @default("Pending") // e.g. Pending, In Progress, Completed
+  mode         String   @default("Onsite")  // e.g. Remote, Onsite, Hybrid
+  createdAt    DateTime @default(now())
+}
+
+model Leave {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String
+  startDate    DateTime
+  endDate      DateTime
+  type         String
+  reason       String
+  status       String   @default("Pending") // Pending, Approved, Ignored, Cancelled
+  createdAt    DateTime @default(now())
+}
+
+model Attendance {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String
+  date         String   // e.g. "2026-07-10"
+  checkIn      String   // e.g. "09:00 AM"
+  checkOut     String?  // e.g. "06:00 PM"
+  status       String   // e.g. Present, Checked In
+  createdAt    DateTime @default(now())
+}
+
+model Message {
+  id           String   @id @default(uuid())
+  channel      String   // e.g. "public", "marketing", "technical", "core", or direct "dm:A:B"
+  senderId     String
+  senderName   String
+  content      String
+  createdAt    DateTime @default(now())
+}
+
+model ChannelAccessRequest {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String
+  channel      String   // "marketing", "technical", "core"
+  status       String   @default("Pending") // "Pending", "Approved", "Rejected"
+  createdAt    DateTime @default(now())
+  @@unique([employeeId, channel])
+}
+
+model Event {
+  id                  String   @id @default(uuid())
+  title               String
+  description         String
+  organisingCollege   String
+  representatives     String   // JSON array of { id, name } objects (max 5)
+  startDate           DateTime
+  endDate             DateTime
+  startTime           String   // e.g. "09:00 AM"
+  endTime             String   // e.g. "05:00 PM"
+  venueAddress        String
+  createdAt           DateTime @default(now())
+}
+
+model WorkSubmission {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employeeName String
+  title        String
+  description  String
+  taskId       String?  // Optional linked task ID
+  taskTitle    String?  // Optional linked task title
+  hoursSpent   Float
+  status       String   @default("Submitted") // Submitted, Reviewed, Approved, Needs Revision
+  adminNote    String?
+  submittedAt  DateTime @default(now())
+}
+
+model Lead {
+  id           String   @id @default(uuid())
+  businessName String
+  contactName  String?
+  email        String?
+  phone        String?
+  website      String?
+  location     String?
+  category     String?
+  source       String   // JustDial, Yelp, Sulekha, Upwork, LinkedIn, Clutch, Freelancer, etc.
+  sourceUrl    String?
+  description  String?
+  rating       String?
+  reviewCount  String?
+  status       String   @default("New")   // New, Contacted, Qualified, Proposal, Won, Lost
+  priority     String   @default("Medium") // Low, Medium, High
+  notes        String?
+  assignedTo   String?  // employee ID
+  allowed      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

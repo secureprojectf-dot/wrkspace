@@ -1,0 +1,32 @@
+| S.No | Business Name                                | Website Status                 | Phone Number    | Existing Platform / Notes       |
+| ---: | -------------------------------------------- | ------------------------------ | --------------- | ------------------------------- |
+|    1 | Malnadu Kitchen                              | No Website                     | 79951 33335     | -                               |
+|    2 | Kanchi Cafe                                  | No Website                     | No Phone Number | -                               |
+|    3 | My Friend's Circle Restaurant                | No Website                     | 91009 43002     | -                               |
+|    4 | The Funroll Hill Creamery                    | No Custom Website              | 98664 76298     | Uses DotPe for digital ordering |
+|    5 | Old Tree Cafe                                | No Website                     | 90003 02213     | Instagram available             |
+|    6 | Meta V Co-Work Space                         | No Website                     | 80087 23522     | Instagram available             |
+|    7 | Top Up Food Cafe                             | No Website                     | -               | Listed on MagicPin              |
+|    8 | Being Social Drive Up Restaurant             | No Website                     | 08179 105731    | -                               |
+|    9 | Tea Bell Cafe                                | No Website                     | -               | Listed on MagicPin              |
+|   10 | A1 Bakery & Cafe                             | No Website                     | -               | Listed on MagicPin              |
+|   11 | Snack N Shack                                | No Website                     | -               | -                               |
+|   12 | Ann-Tera Kitchen                             | No Website                     | -               | -                               |
+|   13 | Kapoor's Cafe                                | No Website                     | -               | -                               |
+|   14 | Mcafe – Maker's of Milkshake                 | No Website                     | -               | -                               |
+|   15 | Coffee Cup Cafe                              | Website needs modification     | -               | JustDial Listing                |
+|   16 | Ivenico Cafe *(Handwriting unclear)*         | No Website                     | -               | -                               |
+|   17 | Temptations Bakery & Fast Food               | No Website                     | -               | -                               |
+|   18 | Shiny's Kitchen Area *(Handwriting unclear)* | No Website                     | 99833 32869     | JustDial Platform               |
+|   19 | New I's Cafe Bakers                          | No Website                     | -               | MagicPin Platform               |
+|   20 | Cut'n Curve Pro Gym *(Approx.)*              | No Website                     | 95024 50132     | Membership/Delivery Page        |
+|   21 | Cake Factory                                 | No Website                     | -               | JustDial Platform               |
+|   22 | Ayurdhara Hospitals                          | Appointment Website Available  | 90140 9365      | Existing appointment website    |
+|   23 | Tribeca Cafe                                 | No Website                     | -               | JustDial Platform               |
+|   24 | BN Badminton Academy                         | Slot Booking Website Available | 90328 38888     | Existing booking website        |
+|   25 | Mandi Bistro                                 | No Website                     | -               | -                               |
+|   26 | Mara Lazeez Arabian Mandi                    | No Website                     | -               | -                               |
+|   27 | The Village Mandi & Restaurant               | No Website                     | -               | -                               |
+|   28 | MAMA's Restaurant & Mandi                    | No Website                     | -               | -                               |
+|   29 | C/O Rajahmundry Kitchen & Bar                | No Website                     | -               | -                               |
+|   30 | 7 Sisters                                    | No Website                     | -               | -                               |
