@@ -1722,32 +1722,6 @@ async function getDevfolioEvents(city: string, area: string) {
     }
   }
 
-  if (results.length === 0 && data.result.length > 0) {
-    for (const item of data.result.slice(0, 3)) {
-      const name = item.name || "";
-      const desc = item.desc || item.tagline || "";
-      const slug = item.slug || "";
-      const sourceUrl = slug ? `https://devfolio.co/hackathons/${slug}` : "https://devfolio.co";
-      const startsAt = item.starts_at || new Date().toISOString();
-      const endsAt = item.ends_at || startsAt;
-      const { start, end } = adjustToFuture(startsAt, endsAt);
-
-      results.push({
-        title: `${name} (${city} Chapter)`,
-        description: desc.replace(/\*\*/g, "").slice(0, 300) + (desc.length > 300 ? "..." : ""),
-        organisingCollege: `Devfolio ${city} Network`,
-        representatives: JSON.stringify([{ id: "rep_devfolio", name: "Devfolio Local Lead" }]),
-        startDate: start,
-        endDate: end,
-        startTime: "09:00 AM",
-        endTime: "06:00 PM",
-        venueAddress: `${area ? area + ", " : "Tech Hub, "}${city}, India`,
-        source: "Devfolio",
-        sourceUrl
-      });
-    }
-  }
-
   return results;
 }
 
@@ -1792,35 +1766,6 @@ async function getLumaEvents(city: string, area: string) {
         startTime: "10:00 AM",
         endTime: "05:00 PM",
         venueAddress: cityState || `${city}, India`,
-        source: "Luma",
-        sourceUrl
-      });
-    }
-  }
-
-  if (results.length === 0 && data.entries.length > 0) {
-    for (const entry of data.entries.slice(0, 3)) {
-      const event = entry.event || {};
-      const calendar = entry.calendar || {};
-      const name = event.name || "";
-      const desc = calendar.description_short || `Join us for ${name} on Luma.`;
-      const org = calendar.name || "Luma Community Host";
-      const slug = event.url || "";
-      const sourceUrl = slug ? `https://lu.ma/${slug}` : "https://lu.ma";
-      const startsAt = event.start_at || new Date().toISOString();
-      const endsAt = event.end_at || startsAt;
-      const { start, end } = adjustToFuture(startsAt, endsAt);
-
-      results.push({
-        title: `${name} — Live in ${city}`,
-        description: desc,
-        organisingCollege: org,
-        representatives: JSON.stringify([{ id: "rep_luma", name: "Luma Host Coordinator" }]),
-        startDate: start,
-        endDate: end,
-        startTime: "10:00 AM",
-        endTime: "05:00 PM",
-        venueAddress: `${area ? area + ", " : "Main Center, "}${city}, India`,
         source: "Luma",
         sourceUrl
       });
@@ -1875,87 +1820,6 @@ async function getUnstopEvents(city: string, area: string) {
     }
   }
 
-  if (results.length === 0 && data.data.data.length > 0) {
-    for (const item of data.data.data.slice(0, 4)) {
-      const title = item.title || "";
-      const descHtml = item.details || "";
-      const desc = descHtml.replace(/<[^>]*>/g, "").slice(0, 300) + (descHtml.length > 300 ? "..." : "");
-      const orgInfo = item.organisation || {};
-      const orgName = orgInfo.name || "Unstop Partner";
-      const sourceUrl = item.seo_url || item.short_url || "https://unstop.com";
-      const startsAt = item.created_at || new Date().toISOString();
-      const { start, end } = adjustToFuture(startsAt);
-
-      results.push({
-        title: `${title} (Unstop ${city} Edition)`,
-        description: desc,
-        organisingCollege: orgName,
-        representatives: JSON.stringify([{ id: "rep_unstop", name: "Unstop Ambassador" }]),
-        startDate: start,
-        endDate: end,
-        startTime: "09:00 AM",
-        endTime: "05:00 PM",
-        venueAddress: `${area ? area + ", " : "College Campus, "}${city}, India`,
-        source: "Unstop",
-        sourceUrl
-      });
-    }
-  }
-
-  return results;
-}
-
-function generateStudentTribeEvents(city: string, area: string) {
-  const results: any[] = [];
-  const colleges = getLocalColleges(city);
-
-  const templates = [
-    {
-      titleFmt: "Student Tribe Leadership Conclave — {}",
-      descFmt: "Join Student Tribe for the largest Gen Z student networking mixer at {}. Gain insights from startup founders, build connections, and learn leadership skills.",
-      url: "https://studenttribe.in/events",
-      time: ["09:30 AM", "04:30 PM"]
-    },
-    {
-      titleFmt: "Student Tribe Campus Cricket Championship — {}",
-      descFmt: "The ultimate inter-collegiate cricket tournament hosted by Student Tribe at {}. Compete for the trophy, cash prizes, and bragging rights.",
-      url: "https://studenttribe.in/gigs",
-      time: ["08:00 AM", "05:00 PM"]
-    },
-    {
-      titleFmt: "Student Tribe Hackathon & Pitch Fest — {}",
-      descFmt: "A 24-hour product builder challenge at {}. Build creative software prototypes and present your pitches to campus investors.",
-      url: "https://studenttribe.in/mentoring",
-      time: ["10:00 AM", "06:00 PM"]
-    }
-  ];
-
-  templates.forEach((t, i) => {
-    const college = colleges[i % colleges.length];
-    const title = t.titleFmt.replace("{}", college);
-    const desc = t.descFmt.replace("{}", college);
-
-    const daysOffset = 3 + Math.floor(Math.random() * 17);
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() + daysOffset);
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + Math.floor(Math.random() * 2));
-
-    results.push({
-      title,
-      description: desc,
-      organisingCollege: college,
-      representatives: JSON.stringify([{ id: `rep_tribe_${i}`, name: "Student Tribe Lead" }]),
-      startDate,
-      endDate,
-      startTime: t.time[0],
-      endTime: t.time[1],
-      venueAddress: `${area ? area + ", " : ""}${college}, ${city}, India`,
-      source: "Student Tribe",
-      sourceUrl: t.url
-    });
-  });
-
   return results;
 }
 
@@ -1964,9 +1828,8 @@ export async function triggerEventsCrawl(city: string, area: string) {
     const devfolio = await getDevfolioEvents(city, area);
     const luma = await getLumaEvents(city, area);
     const unstop = await getUnstopEvents(city, area);
-    const tribe = generateStudentTribeEvents(city, area);
 
-    const allEvents = [...devfolio, ...luma, ...unstop, ...tribe].slice(0, 10);
+    const allEvents = [...devfolio, ...luma, ...unstop].slice(0, 10);
 
     const imported = [];
     for (const ev of allEvents) {
@@ -2191,58 +2054,71 @@ export async function deleteAllCrawledHrCompanies() {
   }
 }
 
-export async function triggerHrCompaniesCrawl(city: string) {
+export async function triggerHrCompaniesCrawl(city: string): Promise<{ success: boolean; count?: number; error?: string; companies?: any[] }> {
   try {
-    const response = await fetch("https://arbeitnow.com/api/job-board-api");
-    if (!response.ok) {
-      return { success: false, error: "Failed to fetch from Arbeitnow job feed." };
-    }
-    const result = await response.json();
-    if (!result || !result.data || !Array.isArray(result.data)) {
-      return { success: false, error: "Invalid data returned from Arbeitnow feed." };
-    }
+    const projectDir = process.cwd();
+    const crawlerScript = path.join(projectDir, 'leads_crawler', 'crawler.py');
+    const command = `python3 "${crawlerScript}" --city "${city}" --category "Consulting" --max 10 --sources justdial sulekha indiamart`;
 
-    const hrFirstNames = ["Aarav", "Aditya", "Rohan", "Kabir", "Neha", "Ananya", "Ishaan", "Riya", "Karan", "Pooja", "Vikram", "Sneha"];
-    const hrLastNames = ["Sharma", "Verma", "Patel", "Mehta", "Singh", "Reddy", "Nair", "Iyer", "Joshi", "Das", "Rao", "Gupta"];
+    return new Promise<{ success: boolean; count?: number; error?: string; companies?: any[] }>((resolve) => {
+      exec(command, { cwd: projectDir }, async (error, stdout, stderr) => {
+        if (error) {
+          console.error('HR companies crawler failed:', error);
+          resolve({ success: false, error: 'Crawler execution failed. Please verify python3 is installed.' });
+          return;
+        }
 
-    const crawled = [];
-    const maxItems = 10;
-    
-    for (const item of result.data) {
-      if (crawled.length >= maxItems) break;
+        const latestJsonPath = path.join(projectDir, 'leads_crawler', 'output', 'leads_latest.json');
+        try {
+          if (!fs.existsSync(latestJsonPath)) {
+            resolve({ success: false, error: 'Crawler finished but did not produce leads_latest.json' });
+            return;
+          }
+          const fileContent = fs.readFileSync(latestJsonPath, 'utf8');
+          const rawLeads = JSON.parse(fileContent);
+          const rawLeadsArray = Array.isArray(rawLeads) ? rawLeads : (rawLeads.leads ?? []);
 
-      const companyName = item.company_name || "Tech Solutions Ltd";
-      const jobTitle = item.title || "Software Engineer";
-      const originalLocation = item.location || "Remote";
-      const sourceUrl = item.url || "https://arbeitnow.com";
-      const website = `https://www.${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
+          if (!rawLeadsArray.length) {
+            resolve({ success: true, count: 0, companies: [] });
+            return;
+          }
 
-      const fName = hrFirstNames[Math.floor(Math.random() * hrFirstNames.length)];
-      const lName = hrLastNames[Math.floor(Math.random() * hrLastNames.length)];
-      const hrName = `${fName} ${lName}`;
-      const hrEmail = `${fName.toLowerCase()}.${lName.toLowerCase()}@${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
-      const hrPhone = `+91 ${90000 + Math.floor(Math.random() * 9999)} ${10000 + Math.floor(Math.random() * 89999)}`;
+          const crawled = [];
+          for (const lead of rawLeadsArray) {
+            const existing = await db.hrCompany.findFirst({
+              where: {
+                companyName: lead.businessName,
+                location: lead.location || city
+              }
+            });
+            if (existing) continue;
 
-      const created = await db.hrCompany.create({
-        data: {
-          companyName,
-          website,
-          industry: jobTitle,
-          location: `${city}, India (HQ: ${originalLocation})`,
-          hrName,
-          hrEmail,
-          hrPhone,
-          source: "Arbeitnow",
-          sourceUrl,
-          notes: `Crawled job role: ${jobTitle}. Listed under location ${originalLocation}.`,
-          status: "New",
-          allowed: false
+            const created = await db.hrCompany.create({
+              data: {
+                companyName: lead.businessName || "Tech Solutions Ltd",
+                website: lead.website || `https://www.google.com/search?q=${encodeURIComponent(lead.businessName || '')}`,
+                industry: lead.category || "Consulting",
+                location: lead.location || `${city}, India`,
+                hrName: lead.contactName || "HR Department",
+                hrEmail: lead.email || "",
+                hrPhone: lead.phone || "",
+                source: lead.source || "JustDial",
+                sourceUrl: lead.sourceUrl || "https://www.justdial.com",
+                notes: lead.description || `Scraped company from ${lead.source || 'JustDial'}.`,
+                status: "New",
+                allowed: false
+              }
+            });
+            crawled.push(created);
+          }
+
+          resolve({ success: true, count: crawled.length, companies: crawled });
+        } catch (err: any) {
+          console.error('Error importing HR companies:', err);
+          resolve({ success: false, error: err.message });
         }
       });
-      crawled.push(created);
-    }
-
-    return { success: true, count: crawled.length, companies: crawled };
+    });
   } catch (error: any) {
     console.error('Error in triggerHrCompaniesCrawl:', error);
     return { success: false, error: error.message };
