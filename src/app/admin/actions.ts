@@ -924,7 +924,8 @@ export async function getChatMembers() {
         id: true,
         firstName: true,
         lastName: true,
-        email: true
+        email: true,
+        wingName: true
       }
     });
 
@@ -946,7 +947,7 @@ export async function getChatMembers() {
         id: e.id,
         name: `${e.firstName} ${e.lastName}`,
         email: e.email,
-        role: 'Employee'
+        role: e.wingName || 'Employee'
       }))
     ];
 
