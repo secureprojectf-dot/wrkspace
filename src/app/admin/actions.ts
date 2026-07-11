@@ -759,9 +759,16 @@ export async function getAllAttendance() {
   }
 }
 
+function getISTDateAndTime() {
+  const d = new Date();
+  const todayStr = d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const timeStr = d.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: true });
+  return { todayStr, timeStr };
+}
+
 export async function getCurrentAttendanceStatus(employeeId: string) {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const { todayStr } = getISTDateAndTime();
     const activeLog = await db.attendance.findFirst({
       where: {
         employeeId,
@@ -778,7 +785,7 @@ export async function getCurrentAttendanceStatus(employeeId: string) {
 
 export async function clockIn(employeeId: string, employeeName: string) {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const { todayStr, timeStr } = getISTDateAndTime();
     
     const existing = await db.attendance.findFirst({
       where: {
@@ -787,12 +794,11 @@ export async function clockIn(employeeId: string, employeeName: string) {
         checkOut: null
       }
     });
-
+ 
     if (existing) {
       return { success: false, error: 'Already clocked in for this shift.' };
     }
-
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+ 
     const log = await db.attendance.create({
       data: {
         employeeId,
@@ -811,7 +817,7 @@ export async function clockIn(employeeId: string, employeeName: string) {
 
 export async function clockOut(employeeId: string) {
   try {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const { todayStr, timeStr } = getISTDateAndTime();
     
     const activeLog = await db.attendance.findFirst({
       where: {
@@ -820,12 +826,11 @@ export async function clockOut(employeeId: string) {
         checkOut: null
       }
     });
-
+ 
     if (!activeLog) {
       return { success: false, error: 'No active shift found to clock out.' };
     }
-
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+ 
     const updated = await db.attendance.update({
       where: { id: activeLog.id },
       data: {

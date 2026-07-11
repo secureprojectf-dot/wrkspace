@@ -3372,157 +3372,152 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 								
 								{hrCompaniesSubTab === 'active' && (
 									<button
-										onClick={() => setShowAddManualHr(true)}
+										onClick={() => setShowAddManualHr(!showAddManualHr)}
 										className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold py-2 px-4 rounded-none flex items-center gap-1.5 transition-colors cursor-pointer"
 									>
-										<PlusIcon className="size-3.5" />
-										Add HR Record
+										{showAddManualHr ? 'Hide Form' : 'Add HR Record'}
 									</button>
 								)}
 							</div>
 
-							{/* Add Manual Modal */}
+							{/* Add Manual Form (Inline) */}
 							{showAddManualHr && (
-								<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-									<div className="bg-zinc-900 border border-zinc-800 p-6 w-full max-w-lg space-y-4">
-										<div className="flex justify-between items-center border-b border-zinc-800 pb-3">
-											<h3 className="text-sm font-bold text-white uppercase tracking-wider">Add HR & Company Record</h3>
-											<button onClick={() => setShowAddManualHr(false)} className="text-zinc-400 hover:text-white cursor-pointer">&times;</button>
-										</div>
-										<form onSubmit={handleAddManualHr} className="space-y-3 font-mono text-xs text-zinc-300">
-											<div className="grid grid-cols-2 gap-3">
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Company Name *</label>
-													<input
-														type="text"
-														required
-														value={manualCompanyName}
-														onChange={e => setManualCompanyName(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-													/>
-												</div>
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Website</label>
-													<input
-														type="text"
-														value={manualWebsite}
-														onChange={e => setManualWebsite(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-														placeholder="https://example.com"
-													/>
-												</div>
-											</div>
-
-											<div className="grid grid-cols-2 gap-3">
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Industry / Job Role</label>
-													<input
-														type="text"
-														value={manualIndustry}
-														onChange={e => setManualIndustry(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-														placeholder="e.g. Software Development"
-													/>
-												</div>
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Location</label>
-													<input
-														type="text"
-														value={manualLocation}
-														onChange={e => setManualLocation(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-														placeholder="e.g. Hyderabad, India"
-													/>
-												</div>
-											</div>
-
-											<div className="border-t border-zinc-800/60 my-2 pt-2">
-												<h4 className="text-[10px] text-brand-400 font-bold uppercase tracking-wider mb-2">HR Contact Info</h4>
-											</div>
-
-											<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Manager Name *</label>
-													<input
-														type="text"
-														required
-														value={manualHrName}
-														onChange={e => setManualHrName(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-													/>
-												</div>
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Email</label>
-													<input
-														type="email"
-														value={manualHrEmail}
-														onChange={e => setManualHrEmail(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-													/>
-												</div>
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Phone</label>
-													<input
-														type="text"
-														value={manualHrPhone}
-														onChange={e => setManualHrPhone(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-													/>
-												</div>
-											</div>
-
-											<div className="grid grid-cols-2 gap-3 pt-2">
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Allocate to Employee</label>
-													<select
-														value={manualAssignedEmployeeId}
-														onChange={e => setManualAssignedEmployeeId(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
-													>
-														<option value="">Unassigned</option>
-														{employeesList.map(emp => (
-															<option key={emp.id} value={emp.id}>
-																{emp.firstName} {emp.lastName} ({emp.id})
-															</option>
-														))}
-													</select>
-												</div>
-												<div className="space-y-1">
-													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Status</label>
-													<select
-														value={manualHrStatus}
-														onChange={e => setManualHrStatus(e.target.value)}
-														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
-													>
-														<option value="New">New</option>
-														<option value="Contacted">Contacted</option>
-														<option value="Rejected">Rejected</option>
-														<option value="Hired">Hired</option>
-													</select>
-												</div>
-											</div>
-
-											<div className="space-y-1">
-												<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Notes / Description</label>
-												<textarea
-													value={manualHrNotes}
-													onChange={e => setManualHrNotes(e.target.value)}
-													rows={2}
-													className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
-												/>
-											</div>
-
-											<div className="flex gap-2 justify-end pt-3">
-												<Button type="button" variant="outline" onClick={() => setShowAddManualHr(false)} className="rounded-none cursor-pointer text-xs">
-													Cancel
-												</Button>
-												<Button type="submit" className="bg-brand-600 hover:bg-brand-500 rounded-none text-xs cursor-pointer">
-													Save Record
-												</Button>
-											</div>
-										</form>
+								<form onSubmit={handleAddManualHr} className="bg-zinc-900/30 border border-zinc-800 p-5 space-y-4">
+									<div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+										<h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">Add HR & Company Record</h3>
+										<button type="button" onClick={() => setShowAddManualHr(false)} className="text-xs text-zinc-500 hover:text-zinc-300">Cancel</button>
 									</div>
-								</div>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Company Name *</label>
+											<input
+												type="text"
+												required
+												value={manualCompanyName}
+												onChange={e => setManualCompanyName(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+											/>
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Website</label>
+											<input
+												type="text"
+												value={manualWebsite}
+												onChange={e => setManualWebsite(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+												placeholder="https://example.com"
+											/>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Industry / Job Role</label>
+											<input
+												type="text"
+												value={manualIndustry}
+												onChange={e => setManualIndustry(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+												placeholder="e.g. Software Development"
+											/>
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Location</label>
+											<input
+												type="text"
+												value={manualLocation}
+												onChange={e => setManualLocation(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+												placeholder="e.g. Hyderabad, India"
+											/>
+										</div>
+									</div>
+
+									<div className="border-t border-zinc-800/60 my-2 pt-2">
+										<h4 className="text-[10px] text-brand-400 font-bold uppercase tracking-wider mb-2">HR Contact Info</h4>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Manager Name *</label>
+											<input
+												type="text"
+												required
+												value={manualHrName}
+												onChange={e => setManualHrName(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+											/>
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Email</label>
+											<input
+												type="email"
+												value={manualHrEmail}
+												onChange={e => setManualHrEmail(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+											/>
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Phone</label>
+											<input
+												type="text"
+												value={manualHrPhone}
+												onChange={e => setManualHrPhone(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+											/>
+										</div>
+									</div>
+
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Allocate to Employee</label>
+											<select
+												value={manualAssignedEmployeeId}
+												onChange={e => setManualAssignedEmployeeId(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+											>
+												<option value="">Unassigned</option>
+												{employeesList.map(emp => (
+													<option key={emp.id} value={emp.id}>
+														{emp.firstName} {emp.lastName} ({emp.id})
+													</option>
+												))}
+											</select>
+										</div>
+										<div className="space-y-1">
+											<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Status</label>
+											<select
+												value={manualHrStatus}
+												onChange={e => setManualHrStatus(e.target.value)}
+												className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+											>
+												<option value="New">New</option>
+												<option value="Contacted">Contacted</option>
+												<option value="Rejected">Rejected</option>
+												<option value="Hired">Hired</option>
+											</select>
+										</div>
+									</div>
+
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Notes / Description</label>
+										<textarea
+											value={manualHrNotes}
+											onChange={e => setManualHrNotes(e.target.value)}
+											rows={2}
+											className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+										/>
+									</div>
+
+									<div className="flex gap-2 justify-end pt-3">
+										<Button type="button" variant="outline" onClick={() => setShowAddManualHr(false)} className="rounded-none cursor-pointer text-xs">
+											Cancel
+										</Button>
+										<Button type="submit" className="bg-brand-600 hover:bg-brand-500 rounded-none text-xs cursor-pointer">
+											Save Record
+										</Button>
+									</div>
+								</form>
 							)}
 
 							{/* Active Registry sub-tab view */}
