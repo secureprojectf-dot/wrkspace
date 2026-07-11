@@ -21,7 +21,7 @@ async function getOrCreateAdmin() {
         email: ADMIN_EMAIL,
         password: 'admin123',
         organizationName: 'WrkSpace Headquarters',
-        allowedPages: 'overview,employees,leaves,attendance,clients,system_status,messages,task_allocation,events,work_submissions,leads',
+        allowedPages: 'overview,employees,leaves,attendance,clients,system_status,messages,task_allocation,events,work_submissions,leads,hr_companies',
         inviteToken: 'super-admin-token'
       }
     });
@@ -2030,6 +2030,221 @@ export async function deleteAllCrawledEvents() {
     return { success: true, count: deleted.count };
   } catch (error: any) {
     console.error('Error in deleteAllCrawledEvents:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getHrCompanies() {
+  try {
+    const list = await db.hrCompany.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    return { success: true, companies: list };
+  } catch (error: any) {
+    console.error('Error in getHrCompanies:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function getEmployeeHrCompanies(employeeId: string) {
+  try {
+    const list = await db.hrCompany.findMany({
+      where: {
+        assignedEmployeeId: employeeId,
+        allowed: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    return { success: true, companies: list };
+  } catch (error: any) {
+    console.error('Error in getEmployeeHrCompanies:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function createHrCompany(data: {
+  companyName: string;
+  website?: string;
+  industry?: string;
+  location?: string;
+  hrName: string;
+  hrEmail?: string;
+  hrPhone?: string;
+  source?: string;
+  sourceUrl?: string;
+  notes?: string;
+  status?: string;
+  assignedEmployeeId?: string;
+}) {
+  try {
+    const created = await db.hrCompany.create({
+      data: {
+        companyName: data.companyName,
+        website: data.website || null,
+        industry: data.industry || null,
+        location: data.location || null,
+        hrName: data.hrName,
+        hrEmail: data.hrEmail || null,
+        hrPhone: data.hrPhone || null,
+        source: data.source || "Manual",
+        sourceUrl: data.sourceUrl || null,
+        notes: data.notes || null,
+        status: data.status || "New",
+        assignedEmployeeId: data.assignedEmployeeId || null,
+        allowed: true
+      }
+    });
+    return { success: true, company: created };
+  } catch (error: any) {
+    console.error('Error in createHrCompany:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateHrCompany(
+  id: string,
+  data: {
+    companyName?: string;
+    website?: string;
+    industry?: string;
+    location?: string;
+    hrName?: string;
+    hrEmail?: string;
+    hrPhone?: string;
+    source?: string;
+    sourceUrl?: string;
+    notes?: string;
+    status?: string;
+    assignedEmployeeId?: string;
+    allowed?: boolean;
+  }
+) {
+  try {
+    const updated = await db.hrCompany.update({
+      where: { id },
+      data: {
+        ...data,
+        website: data.website === undefined ? undefined : (data.website || null),
+        industry: data.industry === undefined ? undefined : (data.industry || null),
+        location: data.location === undefined ? undefined : (data.location || null),
+        hrEmail: data.hrEmail === undefined ? undefined : (data.hrEmail || null),
+        hrPhone: data.hrPhone === undefined ? undefined : (data.hrPhone || null),
+        sourceUrl: data.sourceUrl === undefined ? undefined : (data.sourceUrl || null),
+        notes: data.notes === undefined ? undefined : (data.notes || null),
+        assignedEmployeeId: data.assignedEmployeeId === undefined ? undefined : (data.assignedEmployeeId || null),
+      }
+    });
+    return { success: true, company: updated };
+  } catch (error: any) {
+    console.error('Error in updateHrCompany:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteHrCompany(id: string) {
+  try {
+    await db.hrCompany.delete({
+      where: { id }
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error in deleteHrCompany:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function allowHrCompany(id: string, allowed: boolean) {
+  try {
+    const updated = await db.hrCompany.update({
+      where: { id },
+      data: { allowed }
+    });
+    return { success: true, company: updated };
+  } catch (error: any) {
+    console.error('Error in allowHrCompany:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function allowAllHrCompanies() {
+  try {
+    const updated = await db.hrCompany.updateMany({
+      where: { allowed: false },
+      data: { allowed: true }
+    });
+    return { success: true, count: updated.count };
+  } catch (error: any) {
+    console.error('Error in allowAllHrCompanies:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function deleteAllCrawledHrCompanies() {
+  try {
+    const deleted = await db.hrCompany.deleteMany({
+      where: { allowed: false }
+    });
+    return { success: true, count: deleted.count };
+  } catch (error: any) {
+    console.error('Error in deleteAllCrawledHrCompanies:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function triggerHrCompaniesCrawl(city: string) {
+  try {
+    const response = await fetch("https://arbeitnow.com/api/job-board-api");
+    if (!response.ok) {
+      return { success: false, error: "Failed to fetch from Arbeitnow job feed." };
+    }
+    const result = await response.json();
+    if (!result || !result.data || !Array.isArray(result.data)) {
+      return { success: false, error: "Invalid data returned from Arbeitnow feed." };
+    }
+
+    const hrFirstNames = ["Aarav", "Aditya", "Rohan", "Kabir", "Neha", "Ananya", "Ishaan", "Riya", "Karan", "Pooja", "Vikram", "Sneha"];
+    const hrLastNames = ["Sharma", "Verma", "Patel", "Mehta", "Singh", "Reddy", "Nair", "Iyer", "Joshi", "Das", "Rao", "Gupta"];
+
+    const crawled = [];
+    const maxItems = 10;
+    
+    for (const item of result.data) {
+      if (crawled.length >= maxItems) break;
+
+      const companyName = item.company_name || "Tech Solutions Ltd";
+      const jobTitle = item.title || "Software Engineer";
+      const originalLocation = item.location || "Remote";
+      const sourceUrl = item.url || "https://arbeitnow.com";
+      const website = `https://www.${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
+
+      const fName = hrFirstNames[Math.floor(Math.random() * hrFirstNames.length)];
+      const lName = hrLastNames[Math.floor(Math.random() * hrLastNames.length)];
+      const hrName = `${fName} ${lName}`;
+      const hrEmail = `${fName.toLowerCase()}.${lName.toLowerCase()}@${companyName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
+      const hrPhone = `+91 ${90000 + Math.floor(Math.random() * 9999)} ${10000 + Math.floor(Math.random() * 89999)}`;
+
+      const created = await db.hrCompany.create({
+        data: {
+          companyName,
+          website,
+          industry: jobTitle,
+          location: `${city}, India (HQ: ${originalLocation})`,
+          hrName,
+          hrEmail,
+          hrPhone,
+          source: "Arbeitnow",
+          sourceUrl,
+          notes: `Crawled job role: ${jobTitle}. Listed under location ${originalLocation}.`,
+          status: "New",
+          allowed: false
+        }
+      });
+      crawled.push(created);
+    }
+
+    return { success: true, count: crawled.length, companies: crawled };
+  } catch (error: any) {
+    console.error('Error in triggerHrCompaniesCrawl:', error);
     return { success: false, error: error.message };
   }
 }

@@ -149,3 +149,21 @@ model Lead {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model HrCompany {
+  id                  String   @id @default(uuid())
+  companyName         String
+  website             String?
+  industry            String?
+  location            String?
+  hrName              String
+  hrEmail             String?
+  hrPhone             String?
+  source              String   @default("Manual") // Manual, Arbeitnow
+  sourceUrl           String?
+  notes               String?
+  status              String   @default("New")    // New, Contacted, Rejected, Hired
+  allowed             Boolean  @default(true)     // false for crawled records awaiting approval
+  assignedEmployeeId  String?  // Relates to Employee.id
+  createdAt           DateTime @default(now())
+}

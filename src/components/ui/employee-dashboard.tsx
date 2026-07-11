@@ -30,10 +30,12 @@ import {
 	updateLeadStatus,
 	bulkImportLeads,
 	createManualLead,
+	getEmployeeHrCompanies,
+	updateHrCompany,
 } from '@/app/admin/actions';
 import { MessagesView } from './messages-view';
 
-type EmpTabType = 'overview' | 'tasks' | 'attendance' | 'leaves' | 'messages' | 'events' | 'work_submission' | 'leads' | 'profile';
+type EmpTabType = 'overview' | 'tasks' | 'attendance' | 'leaves' | 'messages' | 'events' | 'work_submission' | 'leads' | 'hr_companies' | 'profile';
 
 interface EmployeeDashboardProps {
 	employee: any;
@@ -188,6 +190,49 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 		}
 	};
 
+	const [employeeHrCompanies, setEmployeeHrCompanies] = useState<any[]>([]);
+	const [isHrLoading, setIsHrLoading] = useState(false);
+	const [hrSearchQuery, setHrSearchQuery] = useState('');
+	const [updatingHrId, setUpdatingHrId] = useState<string | null>(null);
+
+	const loadEmployeeHrCompanies = async () => {
+		setIsHrLoading(true);
+		try {
+			const res = await getEmployeeHrCompanies(employee.id);
+			if (res.success && res.companies) {
+				setEmployeeHrCompanies(res.companies);
+			}
+		} catch (error) {
+			console.error('Failed to load employee HR companies:', error);
+		} finally {
+			setIsHrLoading(false);
+		}
+	};
+
+	const handleHrStatusUpdate = async (id: string, newStatus: string) => {
+		setUpdatingHrId(id);
+		try {
+			await updateHrCompany(id, { status: newStatus });
+			await loadEmployeeHrCompanies();
+		} catch (error) {
+			console.error('Failed to update company status:', error);
+		} finally {
+			setUpdatingHrId(null);
+		}
+	};
+
+	const handleHrNotesUpdate = async (id: string, notes: string) => {
+		setUpdatingHrId(id);
+		try {
+			await updateHrCompany(id, { notes });
+			await loadEmployeeHrCompanies();
+		} catch (error) {
+			console.error('Failed to update company notes:', error);
+		} finally {
+			setUpdatingHrId(null);
+		}
+	};
+
 	const loadLeads = async () => {
 		try {
 			const data = await getLeads({ allowed: true });
@@ -270,6 +315,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 			loadMySubmissions();
 			loadLeads();
 			loadEvents();
+			loadEmployeeHrCompanies();
 		}
 	}, [employee?.id]);
 
@@ -561,7 +607,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 							activeTab === 'work_submission' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/50 hover:text-white'
 						)}
 					>
-							Work Submission
+							Submissions
 					</button>
 					<button
 						onClick={() => {
@@ -574,6 +620,18 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 						)}
 					>
 						Leads
+					</button>
+					<button
+						onClick={() => {
+							setActiveTab('hr_companies');
+							loadEmployeeHrCompanies();
+						}}
+						className={cn(
+							"py-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap",
+							activeTab === 'hr_companies' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/50 hover:text-white'
+						)}
+					>
+						Companies
 					</button>
 					<button
 						onClick={() => {
@@ -1629,6 +1687,142 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 											)}
 										</div>
 									))}
+								</div>
+							)}
+						</div>
+					);
+				})()}
+
+				{activeTab === 'hr_companies' && (() => {
+					const STATUS_COLOURS: Record<string, string> = {
+						New:        'bg-zinc-800/60 border-zinc-700 text-zinc-300',
+						Contacted:  'bg-blue-950/40 border-blue-800/60 text-blue-300',
+						Rejected:   'bg-red-950/40 border-red-800/60 text-red-300',
+						Hired:      'bg-emerald-950/40 border-emerald-800/60 text-emerald-300',
+					};
+
+					const filteredCompanies = employeeHrCompanies.filter(c => {
+						const query = hrSearchQuery.toLowerCase();
+						return (
+							c.companyName.toLowerCase().includes(query) ||
+							(c.hrName || '').toLowerCase().includes(query) ||
+							(c.industry || '').toLowerCase().includes(query) ||
+							(c.location || '').toLowerCase().includes(query)
+						);
+					});
+
+					return (
+						<div className="space-y-6">
+							<div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+								<div>
+									<h2 className="text-xl font-bold text-white flex items-center gap-2 font-sans">
+										<BriefcaseIcon className="size-5 text-brand-400" />
+										Assigned HR & Companies
+									</h2>
+									<p className="text-[10px] text-zinc-500 font-mono mt-0.5">Manage recruitment status and communication logs for your allocated company leads.</p>
+								</div>
+								<button
+									onClick={loadEmployeeHrCompanies}
+									disabled={isHrLoading}
+									className="p-2 border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-850 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer disabled:opacity-50"
+									title="Refresh List"
+								>
+									<RefreshCwIcon className={`size-3.5 ${isHrLoading ? 'animate-spin text-brand-400' : ''}`} />
+								</button>
+							</div>
+
+							{/* Search bar */}
+							<div className="w-full">
+								<input
+									type="text"
+									placeholder="Search by company name, HR name, location, or industry…"
+									value={hrSearchQuery}
+									onChange={e => setHrSearchQuery(e.target.value)}
+									className="w-full bg-zinc-900/30 border border-zinc-800 text-white text-xs p-3 rounded-none placeholder:text-zinc-650 focus:outline-none focus:ring-1 focus:ring-brand-600 font-mono"
+								/>
+							</div>
+
+							{isHrLoading && employeeHrCompanies.length === 0 ? (
+								<div className="text-center py-10 bg-zinc-900/10 border border-zinc-800/40 text-xs italic text-zinc-500 font-mono">
+									Loading allocated HR registries...
+								</div>
+							) : filteredCompanies.length === 0 ? (
+								<div className="text-center py-10 bg-zinc-900/10 border border-zinc-800/40 text-xs italic text-zinc-500 font-mono">
+									No allocated companies found matching the search criteria.
+								</div>
+							) : (
+								<div className="bg-zinc-900/20 border border-zinc-800/80 overflow-hidden font-mono text-xs">
+									<div className="overflow-x-auto">
+										<table className="w-full text-left border-collapse">
+											<thead>
+												<tr className="border-b border-zinc-800 text-zinc-400 uppercase text-[9px] bg-zinc-950/40">
+													<th className="p-3">Company Details</th>
+													<th className="p-3">HR Manager</th>
+													<th className="p-3">Location & Industry</th>
+													<th className="p-3">Status</th>
+													<th className="p-3">Notes & Logs</th>
+												</tr>
+											</thead>
+											<tbody className="divide-y divide-zinc-850 text-zinc-300">
+												{filteredCompanies.map((company) => (
+													<tr key={company.id} className="hover:bg-zinc-900/10 transition-colors">
+														<td className="p-3 space-y-0.5 align-top">
+															<div className="font-semibold text-white text-xs">{company.companyName}</div>
+															{company.website && (
+																<a href={company.website} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 hover:text-brand-400 hover:underline block">
+																	{company.website}
+																</a>
+															)}
+														</td>
+														<td className="p-3 space-y-0.5 align-top">
+															<div className="text-zinc-200">{company.hrName}</div>
+															<div className="text-[10px] text-zinc-500 flex flex-col">
+																{company.hrEmail && <span>{company.hrEmail}</span>}
+																{company.hrPhone && <span>{company.hrPhone}</span>}
+															</div>
+														</td>
+														<td className="p-3 space-y-0.5 align-top">
+															<div className="text-zinc-300">{company.location || '—'}</div>
+															<div className="text-[10px] text-zinc-500">{company.industry || '—'}</div>
+														</td>
+														<td className="p-3 align-top min-w-[140px]">
+															<select
+																value={company.status}
+																disabled={updatingHrId === company.id}
+																onChange={(e) => handleHrStatusUpdate(company.id, e.target.value)}
+																className={cn(
+																	"bg-zinc-950 border text-[10px] p-1.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none w-full font-bold uppercase tracking-wider border-zinc-800 text-zinc-300",
+																	updatingHrId === company.id ? "opacity-50" : ""
+																)}
+															>
+																<option value="New">New</option>
+																<option value="Contacted">Contacted</option>
+																<option value="Rejected">Rejected</option>
+																<option value="Hired">Hired</option>
+															</select>
+														</td>
+														<td className="p-3 align-top max-w-[320px] space-y-1">
+															<textarea
+																defaultValue={company.notes || ''}
+																disabled={updatingHrId === company.id}
+																placeholder="Add interaction notes..."
+																onBlur={(e) => {
+																	if (e.target.value !== (company.notes || '')) {
+																		handleHrNotesUpdate(company.id, e.target.value);
+																	}
+																}}
+																rows={2}
+																className="w-full bg-zinc-950/60 border border-zinc-800 text-[10px] p-2 text-zinc-300 focus:outline-none focus:border-zinc-700 rounded-none placeholder:text-zinc-650"
+															/>
+															{updatingHrId === company.id && (
+																<span className="text-[9px] text-zinc-500 animate-pulse block">Saving logs...</span>
+															)}
+														</td>
+													</tr>
+												))}
+											</tbody>
+										</table>
+									</div>
 								</div>
 							)}
 						</div>

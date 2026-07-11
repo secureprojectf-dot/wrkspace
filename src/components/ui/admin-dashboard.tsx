@@ -17,7 +17,7 @@ import {
 	UserPlusIcon,
 	PlusIcon,
 } from 'lucide-react';
-import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents } from '@/app/admin/actions';
+import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents, getHrCompanies, createHrCompany, updateHrCompany, deleteHrCompany, triggerHrCompaniesCrawl, allowHrCompany, allowAllHrCompanies, deleteAllCrawledHrCompanies } from '@/app/admin/actions';
 import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon, PencilIcon, CheckIcon, XIcon, EyeIcon, CopyIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessagesView } from './messages-view';
@@ -27,7 +27,7 @@ interface AdminDashboardProps {
 	onLogout: () => void;
 }
 
-type TabType = 'overview' | 'employees' | 'leaves' | 'attendance' | 'clients' | 'system_status' | 'messages' | 'task_allocation' | 'events' | 'work_submissions' | 'leads' | 'super_admin';
+type TabType = 'overview' | 'employees' | 'leaves' | 'attendance' | 'clients' | 'system_status' | 'messages' | 'task_allocation' | 'events' | 'work_submissions' | 'leads' | 'hr_companies' | 'super_admin';
 
 export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -39,7 +39,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [newAdminOrgName, setNewAdminOrgName] = useState('');
 	const [newAdminPassword, setNewAdminPassword] = useState('admin123');
 	const [newAdminPages, setNewAdminPages] = useState<string[]>([
-		'overview', 'employees', 'task_allocation', 'attendance', 'leaves', 'clients', 'messages', 'system_status', 'events', 'work_submissions', 'leads'
+		'overview', 'employees', 'task_allocation', 'attendance', 'leaves', 'clients', 'messages', 'system_status', 'events', 'work_submissions', 'leads', 'hr_companies'
 	]);
 	const [allocatedLink, setAllocatedLink] = useState<string | null>(null);
 	const [isAllocating, setIsAllocating] = useState(false);
@@ -202,10 +202,33 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	};
 
 	// CRUD Modals and Edit States
-	const [editModalType, setEditModalType] = useState<'employee' | 'task' | 'leave' | 'attendance' | 'event' | 'submission' | null>(null);
+	const [editModalType, setEditModalType] = useState<'employee' | 'task' | 'leave' | 'attendance' | 'event' | 'submission' | 'hr_company' | null>(null);
 	const [editingItem, setEditingItem] = useState<any>(null);
 	const [showAddManualLeave, setShowAddManualLeave] = useState(false);
 	const [showAddManualAttendance, setShowAddManualAttendance] = useState(false);
+	const [showAddManualHr, setShowAddManualHr] = useState(false);
+
+	// HR & Companies State variables
+	const [hrCompaniesList, setHrCompaniesList] = useState<any[]>([]);
+	const [hrCompaniesSubTab, setHrCompaniesSubTab] = useState<'active' | 'crawler'>('active');
+	const [crawlHrCity, setCrawlHrCity] = useState('Hyderabad');
+	const [isCrawlingHr, setIsCrawlingHr] = useState(false);
+	const [hrCrawlMsg, setHrCrawlMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+	const [hrSearchQuery, setHrSearchQuery] = useState('');
+	const [assigningHrId, setAssigningHrId] = useState<string | null>(null);
+	const [assignHrEmployeeId, setAssignHrEmployeeId] = useState('');
+
+	// Manual HR & Company Form States
+	const [manualCompanyName, setManualCompanyName] = useState('');
+	const [manualWebsite, setManualWebsite] = useState('');
+	const [manualIndustry, setManualIndustry] = useState('');
+	const [manualLocation, setManualLocation] = useState('');
+	const [manualHrName, setManualHrName] = useState('');
+	const [manualHrEmail, setManualHrEmail] = useState('');
+	const [manualHrPhone, setManualHrPhone] = useState('');
+	const [manualHrNotes, setManualHrNotes] = useState('');
+	const [manualHrStatus, setManualHrStatus] = useState('New');
+	const [manualAssignedEmployeeId, setManualAssignedEmployeeId] = useState('');
 
 	const fetchStats = async () => {
 		setIsRefreshing(true);
@@ -553,6 +576,105 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 		}
 	};
 
+	const fetchHrCompaniesList = async () => {
+		try {
+			const res = await getHrCompanies();
+			if (res.success && res.companies) {
+				setHrCompaniesList(res.companies);
+			}
+		} catch (error) {
+			console.error('Failed to fetch HR companies:', error);
+		}
+	};
+
+	const handleHrCrawl = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setIsCrawlingHr(true);
+		setHrCrawlMsg(null);
+		try {
+			const res = await triggerHrCompaniesCrawl(crawlHrCity);
+			if (res.success) {
+				setHrCrawlMsg({ type: 'success', text: `Successfully crawled ${res.count} companies for ${crawlHrCity}!` });
+				await fetchHrCompaniesList();
+			} else {
+				setHrCrawlMsg({ type: 'error', text: res.error || 'Crawling failed.' });
+			}
+		} catch (error: any) {
+			setHrCrawlMsg({ type: 'error', text: error.message || 'An error occurred.' });
+		} finally {
+			setIsCrawlingHr(false);
+		}
+	};
+
+	const handleAddManualHr = async (e: React.FormEvent) => {
+		e.preventDefault();
+		try {
+			const res = await createHrCompany({
+				companyName: manualCompanyName,
+				website: manualWebsite,
+				industry: manualIndustry,
+				location: manualLocation,
+				hrName: manualHrName,
+				hrEmail: manualHrEmail,
+				hrPhone: manualHrPhone,
+				status: manualHrStatus,
+				notes: manualHrNotes,
+				assignedEmployeeId: manualAssignedEmployeeId
+			});
+			if (res.success) {
+				setShowAddManualHr(false);
+				setManualCompanyName('');
+				setManualWebsite('');
+				setManualIndustry('');
+				setManualLocation('');
+				setManualHrName('');
+				setManualHrEmail('');
+				setManualHrPhone('');
+				setManualHrStatus('New');
+				setManualHrNotes('');
+				setManualAssignedEmployeeId('');
+				await fetchHrCompaniesList();
+			} else {
+				alert(res.error || 'Failed to add manual record.');
+			}
+		} catch (error: any) {
+			alert(error.message);
+		}
+	};
+
+	const handleHrAssign = async (id: string, empId: string) => {
+		await updateHrCompany(id, { assignedEmployeeId: empId || '' });
+		setAssigningHrId(null);
+		setAssignHrEmployeeId('');
+		await fetchHrCompaniesList();
+	};
+
+	const handleHrDelete = async (id: string) => {
+		if (confirm('Are you sure you want to delete this company record?')) {
+			await deleteHrCompany(id);
+			await fetchHrCompaniesList();
+		}
+	};
+
+	const handleHrAllow = async (id: string, allowed: boolean) => {
+		await allowHrCompany(id, allowed);
+		await fetchHrCompaniesList();
+	};
+
+	const handleHrAllowAll = async () => {
+		if (confirm('Are you sure you want to approve all crawled company records?')) {
+			await allowAllHrCompanies();
+			await fetchHrCompaniesList();
+		}
+	};
+
+	const handleHrDeleteAllCrawled = async () => {
+		if (confirm('Are you sure you want to clear all unapproved crawled companies?')) {
+			await deleteAllCrawledHrCompanies();
+			await fetchHrCompaniesList();
+		}
+	};
+
 	const handleLeadStatusUpdate = async (id: string, status: string) => {
 		setUpdatingLeadId(id);
 		await updateLeadStatus(id, status);
@@ -711,6 +833,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 		fetchEvents();
 		fetchSubmissions();
 		fetchLeads();
+		fetchHrCompaniesList();
 		if (email.toLowerCase() === 'webstrixx@gmail.com') {
 			fetchAdmins();
 		}
@@ -960,6 +1083,14 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'leads' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
 							Leads
+						</button>
+					)}
+					{(isSuperAdmin || allowedTabs.includes('hr_companies')) && (
+						<button
+							onClick={() => { setActiveTab('hr_companies'); fetchHrCompaniesList(); }}
+							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'hr_companies' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
+						>
+							Companies
 						</button>
 					)}
 					{isSuperAdmin && (
@@ -3199,6 +3330,476 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 					);
 				})()}
 
+				{activeTab === 'hr_companies' && (() => {
+					const STATUS_COLOURS: Record<string, string> = {
+						New:        'bg-zinc-800/60 border-zinc-700 text-zinc-300',
+						Contacted:  'bg-blue-950/40 border-blue-800/60 text-blue-300',
+						Rejected:   'bg-red-950/40 border-red-800/60 text-red-300',
+						Hired:      'bg-emerald-950/40 border-emerald-800/60 text-emerald-300',
+					};
+
+					const activeCompanies = hrCompaniesList.filter(c => c.allowed === true);
+					const crawledCompanies = hrCompaniesList.filter(c => c.allowed === false);
+
+					const filteredActive = activeCompanies.filter(c => {
+						const query = hrSearchQuery.toLowerCase();
+						return (
+							c.companyName.toLowerCase().includes(query) ||
+							(c.hrName || '').toLowerCase().includes(query) ||
+							(c.industry || '').toLowerCase().includes(query) ||
+							(c.location || '').toLowerCase().includes(query)
+						);
+					});
+
+					return (
+						<div className="space-y-6">
+							{/* Sub-tab navigation */}
+							<div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+								<div className="flex gap-4 text-xs font-mono">
+									<button
+										onClick={() => setHrCompaniesSubTab('active')}
+										className={`pb-2 font-bold cursor-pointer transition-all border-b ${hrCompaniesSubTab === 'active' ? 'border-brand-400 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+									>
+										Active Registry ({activeCompanies.length})
+									</button>
+									<button
+										onClick={() => setHrCompaniesSubTab('crawler')}
+										className={`pb-2 font-bold cursor-pointer transition-all border-b ${hrCompaniesSubTab === 'crawler' ? 'border-brand-400 text-white' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+									>
+										HR Crawler ({crawledCompanies.length})
+									</button>
+								</div>
+								
+								{hrCompaniesSubTab === 'active' && (
+									<button
+										onClick={() => setShowAddManualHr(true)}
+										className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold py-2 px-4 rounded-none flex items-center gap-1.5 transition-colors cursor-pointer"
+									>
+										<PlusIcon className="size-3.5" />
+										Add HR Record
+									</button>
+								)}
+							</div>
+
+							{/* Add Manual Modal */}
+							{showAddManualHr && (
+								<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+									<div className="bg-zinc-900 border border-zinc-800 p-6 w-full max-w-lg space-y-4">
+										<div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+											<h3 className="text-sm font-bold text-white uppercase tracking-wider">Add HR & Company Record</h3>
+											<button onClick={() => setShowAddManualHr(false)} className="text-zinc-400 hover:text-white cursor-pointer">&times;</button>
+										</div>
+										<form onSubmit={handleAddManualHr} className="space-y-3 font-mono text-xs text-zinc-300">
+											<div className="grid grid-cols-2 gap-3">
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Company Name *</label>
+													<input
+														type="text"
+														required
+														value={manualCompanyName}
+														onChange={e => setManualCompanyName(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+													/>
+												</div>
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Website</label>
+													<input
+														type="text"
+														value={manualWebsite}
+														onChange={e => setManualWebsite(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+														placeholder="https://example.com"
+													/>
+												</div>
+											</div>
+
+											<div className="grid grid-cols-2 gap-3">
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Industry / Job Role</label>
+													<input
+														type="text"
+														value={manualIndustry}
+														onChange={e => setManualIndustry(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+														placeholder="e.g. Software Development"
+													/>
+												</div>
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Location</label>
+													<input
+														type="text"
+														value={manualLocation}
+														onChange={e => setManualLocation(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+														placeholder="e.g. Hyderabad, India"
+													/>
+												</div>
+											</div>
+
+											<div className="border-t border-zinc-800/60 my-2 pt-2">
+												<h4 className="text-[10px] text-brand-400 font-bold uppercase tracking-wider mb-2">HR Contact Info</h4>
+											</div>
+
+											<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Manager Name *</label>
+													<input
+														type="text"
+														required
+														value={manualHrName}
+														onChange={e => setManualHrName(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+													/>
+												</div>
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Email</label>
+													<input
+														type="email"
+														value={manualHrEmail}
+														onChange={e => setManualHrEmail(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+													/>
+												</div>
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">HR Phone</label>
+													<input
+														type="text"
+														value={manualHrPhone}
+														onChange={e => setManualHrPhone(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+													/>
+												</div>
+											</div>
+
+											<div className="grid grid-cols-2 gap-3 pt-2">
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Allocate to Employee</label>
+													<select
+														value={manualAssignedEmployeeId}
+														onChange={e => setManualAssignedEmployeeId(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+													>
+														<option value="">Unassigned</option>
+														{employeesList.map(emp => (
+															<option key={emp.id} value={emp.id}>
+																{emp.firstName} {emp.lastName} ({emp.id})
+															</option>
+														))}
+													</select>
+												</div>
+												<div className="space-y-1">
+													<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Status</label>
+													<select
+														value={manualHrStatus}
+														onChange={e => setManualHrStatus(e.target.value)}
+														className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+													>
+														<option value="New">New</option>
+														<option value="Contacted">Contacted</option>
+														<option value="Rejected">Rejected</option>
+														<option value="Hired">Hired</option>
+													</select>
+												</div>
+											</div>
+
+											<div className="space-y-1">
+												<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Notes / Description</label>
+												<textarea
+													value={manualHrNotes}
+													onChange={e => setManualHrNotes(e.target.value)}
+													rows={2}
+													className="w-full bg-zinc-950 border border-zinc-800 text-white p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none"
+												/>
+											</div>
+
+											<div className="flex gap-2 justify-end pt-3">
+												<Button type="button" variant="outline" onClick={() => setShowAddManualHr(false)} className="rounded-none cursor-pointer text-xs">
+													Cancel
+												</Button>
+												<Button type="submit" className="bg-brand-600 hover:bg-brand-500 rounded-none text-xs cursor-pointer">
+													Save Record
+												</Button>
+											</div>
+										</form>
+									</div>
+								</div>
+							)}
+
+							{/* Active Registry sub-tab view */}
+							{hrCompaniesSubTab === 'active' && (
+								<div className="space-y-4">
+									{/* Search bar */}
+									<div className="w-full">
+										<Input
+											type="text"
+											placeholder="Search companies, HR managers, locations, industries…"
+											value={hrSearchQuery}
+											onChange={e => setHrSearchQuery(e.target.value)}
+											className="w-full bg-zinc-900/30 border-zinc-800 text-white text-xs p-3 rounded-none placeholder:text-zinc-600 focus:ring-brand-600"
+										/>
+									</div>
+
+									{filteredActive.length === 0 ? (
+										<div className="text-center py-10 bg-zinc-900/10 border border-zinc-800/40 text-xs italic text-zinc-500">
+											No active company records found matching the criteria.
+										</div>
+									) : (
+										<div className="bg-zinc-900/20 border border-zinc-800/80 overflow-hidden">
+											<div className="overflow-x-auto">
+												<table className="w-full text-left text-xs border-collapse">
+													<thead>
+														<tr className="border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[9px] bg-zinc-950/40">
+															<th className="p-3">Company Details</th>
+															<th className="p-3">HR Manager</th>
+															<th className="p-3">Location & Industry</th>
+															<th className="p-3">Allocated To</th>
+															<th className="p-3">Status</th>
+															<th className="p-3 text-right">Actions</th>
+														</tr>
+													</thead>
+													<tbody className="divide-y divide-zinc-850 font-mono text-zinc-300">
+														{filteredActive.map((company) => {
+															const assignee = employeesList.find(e => e.id === company.assignedEmployeeId);
+
+															return (
+																<tr key={company.id} className="hover:bg-zinc-900/20 transition-colors">
+																	<td className="p-3 space-y-0.5">
+																		<div className="font-semibold text-white text-xs">{company.companyName}</div>
+																		{company.website && (
+																			<a href={company.website} target="_blank" rel="noopener noreferrer" className="text-[10px] text-brand-500 hover:text-brand-400 flex items-center gap-1 hover:underline">
+																				<span>{company.website}</span>
+																			</a>
+																		)}
+																	</td>
+																	<td className="p-3 space-y-0.5">
+																		<div className="text-zinc-200">{company.hrName}</div>
+																		<div className="text-[10px] text-zinc-500 flex flex-col">
+																			{company.hrEmail && <span>{company.hrEmail}</span>}
+																			{company.hrPhone && <span>{company.hrPhone}</span>}
+																		</div>
+																	</td>
+																	<td className="p-3 space-y-0.5">
+																		<div className="text-zinc-300">{company.location || '—'}</div>
+																		<div className="text-[10px] text-zinc-500">{company.industry || '—'}</div>
+																	</td>
+																	<td className="p-3">
+																		{assigningHrId === company.id ? (
+																			<div className="flex items-center gap-1.5 max-w-[200px]">
+																				<select
+																					value={assignHrEmployeeId}
+																					onChange={e => setAssignHrEmployeeId(e.target.value)}
+																					className="bg-zinc-950 border border-zinc-800 text-white text-[10px] p-1.5 w-full focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+																				>
+																					<option value="">Unassigned</option>
+																					{employeesList.map(emp => (
+																						<option key={emp.id} value={emp.id}>
+																							{emp.firstName} {emp.lastName} ({emp.id})
+																						</option>
+																					))}
+																				</select>
+																				<button
+																					onClick={() => handleHrAssign(company.id, assignHrEmployeeId)}
+																					className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+																					title="Confirm Allocation"
+																				>
+																					<CheckIcon className="size-3" />
+																				</button>
+																				<button
+																					onClick={() => setAssigningHrId(null)}
+																					className="p-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 cursor-pointer"
+																					title="Cancel"
+																				>
+																					<XIcon className="size-3" />
+																				</button>
+																			</div>
+										) : (
+																			<button
+																				onClick={() => { setAssigningHrId(company.id); setAssignHrEmployeeId(company.assignedEmployeeId || ''); }}
+																				className="text-[10px] flex items-center gap-1.5 py-1 px-2 border border-zinc-800 hover:border-zinc-700 bg-zinc-950 text-zinc-300 hover:text-white transition-all font-mono"
+																			>
+																				<UserCheckIcon className="size-3 text-indigo-400" />
+																				<span>{assignee ? `${assignee.firstName} (${assignee.id})` : 'Allocate Agent'}</span>
+																			</button>
+																		)}
+																	</td>
+																	<td className="p-3">
+																		<span className={cn(
+																			"px-2 py-0.5 text-[9px] font-bold border uppercase whitespace-nowrap",
+																			STATUS_COLOURS[company.status] || 'bg-zinc-800 border-zinc-700 text-zinc-400'
+																		)}>
+																			{company.status}
+																		</span>
+																	</td>
+																	<td className="p-3 text-right">
+																		<div className="flex justify-end gap-1">
+																			<button
+																				onClick={() => {
+																					setEditingItem(company);
+																					setEditModalType('hr_company');
+																				}}
+																				className="p-1.5 border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-indigo-400 hover:border-indigo-900 cursor-pointer transition-all"
+																				title="Edit Record"
+																			>
+																				<PencilIcon className="size-3.5" />
+																			</button>
+																			<button
+																				onClick={() => handleHrDelete(company.id)}
+																				className="p-1.5 border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-red-400 hover:border-red-900 cursor-pointer transition-all"
+																				title="Delete Record"
+																			>
+																				<Trash2Icon className="size-3.5" />
+																			</button>
+																		</div>
+																	</td>
+																</tr>
+															);
+														})}
+													</tbody>
+												</table>
+											</div>
+										</div>
+									)}
+								</div>
+							)}
+
+							{/* HR Crawler sub-tab view */}
+							{hrCompaniesSubTab === 'crawler' && (
+								<div className="space-y-6">
+									<form onSubmit={handleHrCrawl} className="bg-zinc-900/30 border border-zinc-800 p-4 space-y-4">
+										<div className="flex items-center justify-between border-b border-zinc-800 pb-2">
+											<h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider">HR & Job Boards Crawler</h3>
+											<span className="text-[10px] text-zinc-500 font-mono">Source Feed: Arbeitnow Job Feed API</span>
+										</div>
+										<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+											<div className="space-y-1 col-span-2">
+												<label className="text-[10px] text-zinc-500 uppercase tracking-wider font-semibold">Target City (Filters generated HR location) *</label>
+												<select
+													value={crawlHrCity}
+													onChange={e => setCrawlHrCity(e.target.value)}
+													required
+													className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2.5 focus:outline-none focus:ring-1 focus:ring-brand-600 font-mono rounded-none"
+												>
+													{citiesList.map(c => (
+														<option key={c} value={c}>{c}</option>
+													))}
+												</select>
+											</div>
+											<div className="flex items-end">
+												<button
+													type="submit"
+													disabled={isCrawlingHr}
+													className="w-full bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold py-2.5 cursor-pointer transition-colors disabled:opacity-50"
+												>
+													{isCrawlingHr ? 'Crawling Job Boards...' : 'Run HR Scraper'}
+												</button>
+											</div>
+										</div>
+										{hrCrawlMsg && (
+											<div className={cn("p-2 text-[11px] border font-mono", hrCrawlMsg.type === 'success' ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400" : "bg-red-950/20 border-red-900/40 text-red-400")}>
+												{hrCrawlMsg.text}
+											</div>
+										)}
+									</form>
+
+									{/* Crawled statistics */}
+									<div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+										<div className="bg-zinc-900/30 border border-zinc-800/80 p-3 space-y-0.5">
+											<p className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Total Scraped</p>
+											<p className="text-base font-bold text-white">{hrCompaniesList.length}</p>
+										</div>
+										<div className="bg-zinc-900/30 border border-zinc-800/80 p-3 space-y-0.5">
+											<p className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Awaiting Approval</p>
+											<p className="text-base font-bold text-amber-400">{crawledCompanies.length}</p>
+										</div>
+										<div className="bg-zinc-900/30 border border-zinc-800/80 p-3 space-y-0.5">
+											<p className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold">Approved Directory</p>
+											<p className="text-base font-bold text-emerald-400">{activeCompanies.length}</p>
+										</div>
+										<div className="flex items-center gap-1 col-span-2 sm:col-span-1 justify-end">
+											<button
+												onClick={handleHrAllowAll}
+												disabled={crawledCompanies.length === 0}
+												className="bg-emerald-950/30 hover:bg-emerald-900/40 border border-emerald-800/40 text-emerald-400 text-[10px] font-bold py-2 px-3 rounded-none transition-all disabled:opacity-40 cursor-pointer h-full uppercase tracking-wider font-mono flex items-center justify-center gap-1"
+											>
+												<CheckCircleIcon className="size-3.5" /> Approve All
+											</button>
+											<button
+												onClick={handleHrDeleteAllCrawled}
+												disabled={crawledCompanies.length === 0}
+												className="bg-red-950/30 hover:bg-red-900/40 border border-red-800/40 text-red-400 text-[10px] font-bold py-2 px-3 rounded-none transition-all disabled:opacity-40 cursor-pointer h-full uppercase tracking-wider font-mono flex items-center justify-center gap-1"
+											>
+												<Trash2Icon className="size-3.5" /> Clear All
+											</button>
+										</div>
+									</div>
+
+									{/* Crawled Approval Review Table */}
+									{crawledCompanies.length === 0 ? (
+										<div className="text-center py-10 bg-zinc-900/10 border border-zinc-800/40 text-xs italic text-zinc-500">
+											No crawled company records are currently awaiting approval.
+										</div>
+									) : (
+										<div className="bg-zinc-900/20 border border-zinc-800/80 overflow-hidden">
+											<div className="overflow-x-auto">
+												<table className="w-full text-left text-xs border-collapse">
+													<thead>
+														<tr className="border-b border-zinc-800 text-zinc-400 uppercase font-mono text-[9px] bg-zinc-950/40">
+															<th className="p-3">Company Details</th>
+															<th className="p-3">Generated HR Contact</th>
+															<th className="p-3">Location & Feed Context</th>
+															<th className="p-3 text-right">Approval Actions</th>
+														</tr>
+													</thead>
+													<tbody className="divide-y divide-zinc-850 font-mono text-zinc-300">
+														{crawledCompanies.map((company) => (
+															<tr key={company.id} className="hover:bg-zinc-900/20 transition-colors">
+																<td className="p-3 space-y-0.5">
+																	<div className="font-semibold text-white text-xs">{company.companyName}</div>
+																	{company.website && (
+																		<a href={company.website} target="_blank" rel="noopener noreferrer" className="text-[10px] text-zinc-500 hover:text-brand-400">
+																			{company.website}
+																		</a>
+																	)}
+																</td>
+																<td className="p-3 space-y-0.5">
+																	<div className="text-zinc-200">{company.hrName}</div>
+																	<div className="text-[10px] text-zinc-500">
+																		{company.hrEmail} · {company.hrPhone}
+																	</div>
+																</td>
+																<td className="p-3 space-y-0.5">
+																	<div className="text-zinc-300">{company.location}</div>
+																	<div className="text-[10px] text-zinc-500">{company.industry}</div>
+																</td>
+																<td className="p-3 text-right">
+																	<div className="flex justify-end gap-1.5">
+																		<button
+																			onClick={() => handleHrAllow(company.id, true)}
+																			className="bg-emerald-950/40 border border-emerald-900/40 hover:bg-emerald-900/50 text-emerald-400 font-bold py-1 px-3 text-[10px] uppercase rounded-none cursor-pointer flex items-center gap-1 transition-all"
+																		>
+																			<CheckIcon className="size-3" /> Approve
+																		</button>
+																		<button
+																			onClick={() => handleHrDelete(company.id)}
+																			className="bg-red-950/40 border border-red-900/40 hover:bg-red-900/50 text-red-400 font-bold py-1 px-3 text-[10px] uppercase rounded-none cursor-pointer flex items-center gap-1 transition-all"
+																		>
+																			<Trash2Icon className="size-3" /> Delete
+																		</button>
+																	</div>
+																</td>
+															</tr>
+														))}
+													</tbody>
+												</table>
+											</div>
+										</div>
+									)}
+								</div>
+							)}
+						</div>
+					);
+				})()}
+
 				{activeTab === 'super_admin' && isSuperAdmin && (
 					<div className="space-y-6">
 						<div className="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -3295,7 +3896,8 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 												{ id: 'system_status', name: 'System Resource Status' },
 												{ id: 'events', name: 'Events Calendar' },
 												{ id: 'work_submissions', name: 'Work Submissions' },
-												{ id: 'leads', name: 'Leads CRM Pipeline' }
+												{ id: 'leads', name: 'Leads CRM Pipeline' },
+												{ id: 'hr_companies', name: 'HR & Companies' }
 											].map(item => (
 												<label key={item.id} className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer hover:text-white select-none">
 													<input
@@ -3393,7 +3995,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 					<div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 p-6 space-y-4 shadow-2xl relative">
 						<div className="flex justify-between items-center border-b border-zinc-800 pb-3">
 							<h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-								Edit {editModalType === 'employee' ? 'Employee Profile' : editModalType === 'task' ? 'Task Allocation' : editModalType === 'attendance' ? 'Attendance Log' : 'Event Details'}
+								Edit {editModalType === 'employee' ? 'Employee Profile' : editModalType === 'task' ? 'Task Allocation' : editModalType === 'attendance' ? 'Attendance Log' : editModalType === 'event' ? 'Event Details' : editModalType === 'hr_company' ? 'HR & Company' : 'Details'}
 							</h3>
 							<button 
 								onClick={() => { setEditModalType(null); setEditingItem(null); }}
@@ -3668,13 +4270,114 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 											))}
 										</div>
 									</div>
-									<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
-										<Button type="button" variant="outline" onClick={() => { setEditModalType(null); setEditingItem(null); }} className="text-xs rounded-none h-9 cursor-pointer border-zinc-800 text-zinc-300">Cancel</Button>
-										<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-none h-9 text-white cursor-pointer">Save Changes</Button>
-									</div>
 								</form>
 							);
 						})()}
+
+						{editModalType === 'hr_company' && (
+							<form
+								onSubmit={async (e) => {
+									e.preventDefault();
+									const formData = new FormData(e.currentTarget);
+									const res = await updateHrCompany(editingItem.id, {
+										companyName: formData.get('companyName') as string,
+										website: formData.get('website') as string,
+										industry: formData.get('industry') as string,
+										location: formData.get('location') as string,
+										hrName: formData.get('hrName') as string,
+										hrEmail: formData.get('hrEmail') as string,
+										hrPhone: formData.get('hrPhone') as string,
+										status: formData.get('status') as string,
+										notes: formData.get('notes') as string,
+										assignedEmployeeId: formData.get('assignedEmployeeId') as string,
+									});
+									if (res.success) {
+										setEditModalType(null);
+										setEditingItem(null);
+										await fetchHrCompaniesList();
+									} else {
+										alert(res.error || 'Failed to save changes.');
+									}
+								}}
+								className="space-y-4 max-h-[75vh] overflow-y-auto pr-1 text-xs font-mono text-zinc-300"
+							>
+								<div className="grid grid-cols-2 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Company Name</label>
+										<Input name="companyName" defaultValue={editingItem.companyName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Website</label>
+										<Input name="website" defaultValue={editingItem.website || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Industry / Job Role</label>
+										<Input name="industry" defaultValue={editingItem.industry || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Location</label>
+										<Input name="location" defaultValue={editingItem.location || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+								</div>
+								<div className="border-t border-zinc-800 pt-2">
+									<h4 className="text-[10px] text-brand-400 font-bold uppercase tracking-wider mb-2">HR Contact</h4>
+								</div>
+								<div className="grid grid-cols-3 gap-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">HR Name</label>
+										<Input name="hrName" defaultValue={editingItem.hrName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">HR Email</label>
+										<Input name="hrEmail" type="email" defaultValue={editingItem.hrEmail || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">HR Phone</label>
+										<Input name="hrPhone" defaultValue={editingItem.hrPhone || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0" />
+									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-2 pt-2">
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Allocate Agent</label>
+										<select
+											name="assignedEmployeeId"
+											defaultValue={editingItem.assignedEmployeeId || ''}
+											className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+										>
+											<option value="">Unassigned</option>
+											{employeesList.map(emp => (
+												<option key={emp.id} value={emp.id}>
+													{emp.firstName} {emp.lastName} ({emp.id})
+												</option>
+											))}
+										</select>
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Status</label>
+										<select
+											name="status"
+											defaultValue={editingItem.status}
+											className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs p-2 focus:outline-none focus:ring-1 focus:ring-brand-600 rounded-none font-mono"
+										>
+											<option value="New">New</option>
+											<option value="Contacted">Contacted</option>
+											<option value="Rejected">Rejected</option>
+											<option value="Hired">Hired</option>
+										</select>
+									</div>
+								</div>
+								<div className="space-y-1">
+									<label className="text-[10px] text-zinc-400 uppercase font-medium">Notes / Logs</label>
+									<textarea name="notes" defaultValue={editingItem.notes || ''} rows={2} className="w-full bg-zinc-950 border border-zinc-800 text-xs text-white p-2 outline-none focus:border-zinc-700 rounded-none" />
+								</div>
+								<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">
+									<Button type="button" variant="outline" onClick={() => { setEditModalType(null); setEditingItem(null); }} className="text-xs rounded-none h-9 cursor-pointer border-zinc-800 text-zinc-300">Cancel</Button>
+									<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-xs rounded-none h-9 text-white cursor-pointer">Save Changes</Button>
+								</div>
+							</form>
+						)}
 					</div>
 				</div>
 			)}
