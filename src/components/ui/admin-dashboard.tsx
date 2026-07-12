@@ -2941,80 +2941,107 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										<p className="text-xs mt-1">Click "Create Event" to add the first event</p>
 									</div>
 								) : (
-									<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+									<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 										{activeEvents.map((event: any) => {
 											const reps: { id: string; name: string }[] = JSON.parse(event.representatives || '[]');
 											const startD = new Date(event.startDate);
 											const endD = new Date(event.endDate);
 											return (
-												<div key={event.id} className="bg-zinc-900/30 border border-zinc-800/80 p-5 space-y-4 hover:border-brand-900/60 transition-colors">
-													<div className="flex items-start justify-between gap-3">
-														<div>
-															<h3 className="text-base font-bold text-white">
-																{event.sourceUrl ? (
-																	<a href={event.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-400 hover:underline transition-all">
-																		{event.title}
-																	</a>
-																) : (
-																	event.title
-																)}
-															</h3>
-															<p className="text-xs text-brand-400 font-medium mt-0.5">{event.organisingCollege}</p>
-														</div>
-														<span className="text-[10px] bg-brand-950/40 border border-brand-900/40 text-brand-300 px-2 py-1 font-mono uppercase tracking-wider whitespace-nowrap">
+												<div key={event.id} className="bg-zinc-900/30 border border-zinc-800/80 flex flex-col hover:border-brand-900/60 transition-all duration-305 shadow-lg group relative">
+													{/* Image Banner */}
+													<div className="h-40 w-full relative overflow-hidden bg-zinc-950">
+														{event.imageUrl ? (
+															<img 
+																src={event.imageUrl} 
+																alt={event.title} 
+																className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" 
+															/>
+														) : (
+															<div className="h-full w-full bg-gradient-to-br from-indigo-950 via-zinc-900 to-black relative flex items-center justify-center border-b border-zinc-800">
+																<div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.08),transparent_70%)]" />
+																<CalendarIcon className="size-10 text-brand-500/20" />
+															</div>
+														)}
+														
+														{/* Absolute Badge */}
+														<span className="absolute top-3 right-3 text-[10px] bg-brand-950/80 border border-brand-800/60 text-brand-400 backdrop-blur-sm px-2 py-1 font-mono uppercase tracking-wider whitespace-nowrap">
 															{event.source || 'Event'}
 														</span>
 													</div>
 
-													<p className="text-sm text-zinc-400 leading-relaxed">{event.description}</p>
-
-													<div className="grid grid-cols-2 gap-3 text-xs">
-														<div className="space-y-0.5">
-															<p className="text-zinc-600 uppercase tracking-wider font-semibold">Start</p>
-															<p className="text-zinc-200">{fmt(startD)} · {event.startTime}</p>
-														</div>
-														<div className="space-y-0.5">
-															<p className="text-zinc-600 uppercase tracking-wider font-semibold">End</p>
-															<p className="text-zinc-200">{fmt(endD)} · {event.endTime}</p>
-														</div>
-													</div>
-
-													<div className="flex items-start gap-2 text-xs text-zinc-400">
-														<MapPinIcon className="size-3.5 mt-0.5 text-zinc-600 shrink-0" />
-														<span>{event.venueAddress}</span>
-													</div>
-
-													{reps.length > 0 && (
-														<div className="space-y-1.5">
-															<p className="text-[10px] text-zinc-600 uppercase tracking-wider font-semibold">Company Representatives</p>
-															<div className="flex flex-wrap gap-1.5">
-																{reps.map((r, i) => (
-																	<span key={i} className="text-xs bg-zinc-800/60 border border-zinc-700/60 text-zinc-300 px-2 py-0.5">
-																		{r.name}
-																	</span>
-																))}
+													<div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+														<div className="space-y-3">
+															<div>
+																<h3 className="text-base font-bold text-white">
+																	{event.sourceUrl ? (
+																		<a href={event.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:text-brand-400 hover:underline transition-all">
+																			{event.title}
+																		</a>
+																	) : (
+																		event.title
+																	)}
+																</h3>
+																<p className="text-xs text-brand-400 font-medium mt-0.5">{event.organisingCollege}</p>
 															</div>
-														</div>
-													)}
 
-													<div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/40">
-														<button
-															onClick={() => {
-																setEditingItem(event);
-																setEditModalType('event');
-															}}
-															className="p-1.5 bg-zinc-900 border border-zinc-800 text-indigo-400 hover:text-indigo-300 hover:border-zinc-700 transition-all cursor-pointer"
-															title="Edit Event"
-														>
-															<PencilIcon className="size-3.5" />
-														</button>
-														<button
-															onClick={() => handleDeleteEvent(event.id)}
-															className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:text-red-300 hover:border-zinc-700 transition-all cursor-pointer"
-															title="Delete Event"
-														>
-															<Trash2Icon className="size-3.5" />
-														</button>
+															<p className="text-xs text-zinc-400 leading-relaxed line-clamp-3">{event.description}</p>
+
+															<div className="grid grid-cols-2 gap-3 text-xs">
+																<div className="space-y-0.5">
+																	<p className="text-zinc-600 uppercase tracking-wider font-semibold">Start</p>
+																	<p className="text-zinc-200">{fmt(startD)} · {event.startTime}</p>
+																</div>
+																<div className="space-y-0.5">
+																	<p className="text-zinc-600 uppercase tracking-wider font-semibold">End</p>
+																	<p className="text-zinc-200">{fmt(endD)} · {event.endTime}</p>
+																</div>
+															</div>
+
+															<div className="flex items-start gap-2 text-xs text-zinc-400">
+																<MapPinIcon className="size-3.5 mt-0.5 text-zinc-650 shrink-0" />
+																<span>{event.venueAddress}</span>
+															</div>
+
+															{reps.length > 0 && (
+																<div className="space-y-1.5 pt-1">
+																	<p className="text-[10px] text-zinc-600 uppercase tracking-wider font-semibold">Company Representatives</p>
+																	<div className="flex flex-wrap gap-1.5">
+																		{reps.map((r, i) => (
+																			<span key={i} className="text-xs bg-zinc-800/60 border border-zinc-700/60 text-zinc-300 px-2 py-0.5">
+																				{r.name}
+																			</span>
+																		))}
+																	</div>
+																</div>
+															)}
+														</div>
+
+														<div className="flex justify-end gap-2 pt-3 border-t border-zinc-800/40">
+															<button
+																onClick={() => {
+																	setEditingItem(event);
+																	setEditModalType('event');
+																	setEditEventImageUrl(event.imageUrl || '');
+																	try {
+																		const parsed = JSON.parse(event.representatives || '[]');
+																		setEditEventRepIds(parsed.map((p: any) => p.id));
+																	} catch (e) {
+																		setEditEventRepIds([]);
+																	}
+																}}
+																className="p-1.5 bg-zinc-900 border border-zinc-800 text-indigo-400 hover:text-indigo-300 hover:border-zinc-700 transition-all cursor-pointer"
+																title="Edit Event"
+															>
+																<PencilIcon className="size-3.5" />
+															</button>
+															<button
+																onClick={() => handleDeleteEvent(event.id)}
+																className="p-1.5 bg-zinc-900 border border-zinc-800 text-red-400 hover:text-red-300 hover:border-zinc-700 transition-all cursor-pointer"
+																title="Delete Event"
+															>
+																<Trash2Icon className="size-3.5" />
+															</button>
+														</div>
 													</div>
 												</div>
 											);
