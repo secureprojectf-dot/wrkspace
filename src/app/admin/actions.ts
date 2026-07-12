@@ -1185,7 +1185,7 @@ export async function approveChannelAccessRequest(requestId: string, requestingU
 export async function rejectChannelAccessRequest(requestId: string, requestingUserRole?: string) {
   try {
     if (requestingUserRole !== 'Admin') {
-      return { success: false, error: 'Access denied: Admin only' };
+      return { success: false, error: 'Access denied: Admin  only' };
     }
 
     const updated = await db.channelAccessRequest.update({

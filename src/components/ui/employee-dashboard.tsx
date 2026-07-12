@@ -1247,17 +1247,31 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 								<div className="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-12rem)] scrollbar-thin scrollbar-thumb-zinc-800">
 									
 									{/* Digital ID Pass Card */}
-									<div className="border border-dashed border-zinc-700 bg-zinc-950 p-4 font-mono space-y-2 text-center rounded-none relative overflow-hidden">
+									<div className="border border-dashed border-zinc-700 bg-zinc-950 p-4 font-mono space-y-3 text-center rounded-none relative overflow-hidden flex flex-col items-center">
 										{/* Left ticket cutout */}
 										<div className="absolute -left-2 top-1/2 -translate-y-1/2 size-4 rounded-full bg-zinc-900 border border-zinc-800" />
 										{/* Right ticket cutout */}
 										<div className="absolute -right-2 top-1/2 -translate-y-1/2 size-4 rounded-full bg-zinc-900 border border-zinc-800" />
 										
-										<span className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold block">Official Reference Pass</span>
-										<strong className="text-white text-base tracking-wider block font-bold">
-											EVT-REG-{viewingEvent.id.slice(0, 8).toUpperCase()}-{employee.id.toUpperCase()}
-										</strong>
-										<span className="text-[9px] text-zinc-550 block">This ID serves as your digital clearance reference for this event.</span>
+										{/* Ticket Thumbnail Image */}
+										{viewingEvent.imageUrl && (
+											<div className="w-full h-24 overflow-hidden relative border border-zinc-800/80 mb-1 shrink-0">
+												<img 
+													src={viewingEvent.imageUrl} 
+													alt={viewingEvent.title} 
+													className="h-full w-full object-cover opacity-90" 
+												/>
+												<div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
+											</div>
+										)}
+
+										<div className="space-y-1.5 w-full">
+											<span className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold block">Official Reference Pass</span>
+											<strong className="text-white text-sm md:text-base tracking-wider block font-bold truncate">
+												EVT-REG-{viewingEvent.id.slice(0, 8).toUpperCase()}-{employee.id.toUpperCase()}
+											</strong>
+											<span className="text-[9px] text-zinc-550 block">This ID serves as your digital clearance reference for this event.</span>
+										</div>
 									</div>
 
 									{/* Description */}
