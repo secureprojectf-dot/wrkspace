@@ -1244,6 +1244,18 @@ export async function getEvents() {
   }
 }
 
+export async function getEventById(id: string) {
+  try {
+    const event = await db.event.findUnique({
+      where: { id }
+    });
+    return event;
+  } catch (error) {
+    console.error('Error fetching event by id:', error);
+    return null;
+  }
+}
+
 export async function createWorkSubmission(data: {
   employeeId: string;
   employeeName: string;

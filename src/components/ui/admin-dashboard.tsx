@@ -2954,7 +2954,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 															<img 
 																src={event.imageUrl} 
 																alt={event.title} 
-																className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" 
+																className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-500" 
 															/>
 														) : (
 															<div className="h-full w-full bg-gradient-to-br from-indigo-950 via-zinc-900 to-black relative flex items-center justify-center border-b border-zinc-800">

@@ -66,7 +66,6 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 	// Events state
 	const [eventsList, setEventsList] = useState<any[]>([]);
 	const [eventsLoading, setEventsLoading] = useState(false);
-	const [viewingEvent, setViewingEvent] = useState<any | null>(null);
 
 	const loadEvents = async () => {
 		setEventsLoading(true);
@@ -1157,7 +1156,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 													<img 
 														src={event.imageUrl} 
 														alt={event.title} 
-														className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" 
+														className="h-full w-full object-contain group-hover:scale-105 transition-transform duration-500" 
 													/>
 												) : (
 													<div className="h-full w-full bg-gradient-to-br from-indigo-950 via-zinc-900 to-black relative flex items-center justify-center border-b border-zinc-800">
@@ -1189,7 +1188,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 												<div className="pt-3 border-t border-zinc-900 text-[11px] text-zinc-400 flex items-center justify-between">
 													<span className="font-mono">{fmt(startD)}</span>
 													<button
-														onClick={() => setViewingEvent(event)}
+														onClick={() => window.open(`/events/${event.id}`, '_blank')}
 														className="text-brand-400 hover:text-brand-300 font-bold text-xs uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
 													>
 														View Details →
@@ -1203,139 +1202,6 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 						)}
 					</div>
 				)}
-
-				{/* Event Details View Modal */}
-				{viewingEvent && (() => {
-					const reps: { id: string; name: string }[] = JSON.parse(viewingEvent.representatives || '[]');
-					const startD = new Date(viewingEvent.startDate);
-					const endD = new Date(viewingEvent.endDate);
-					const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-					
-					return (
-						<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 overflow-y-auto">
-							<div className="w-full max-w-lg bg-zinc-900 border border-zinc-800 shadow-2xl relative flex flex-col">
-								{/* Close Button */}
-								<button 
-									onClick={() => setViewingEvent(null)}
-									className="absolute top-4 right-4 z-10 size-8 rounded-full bg-black/50 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-all cursor-pointer text-sm font-semibold"
-								>
-									✕
-								</button>
-
-								{/* Banner Image */}
-								<div className="h-48 w-full relative bg-zinc-950">
-									{viewingEvent.imageUrl ? (
-										<img 
-											src={viewingEvent.imageUrl} 
-											alt={viewingEvent.title} 
-											className="h-full w-full object-cover" 
-										/>
-									) : (
-										<div className="h-full w-full bg-gradient-to-br from-indigo-950 via-zinc-900 to-black relative flex items-center justify-center border-b border-zinc-800">
-											<div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.08),transparent_70%)]" />
-											<CalendarIcon className="size-12 text-brand-500/20" />
-										</div>
-									)}
-									<div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent" />
-									<div className="absolute bottom-4 left-5 right-5">
-										<span className="text-[10px] text-brand-400 font-bold uppercase tracking-widest font-mono">{viewingEvent.organisingCollege}</span>
-										<h3 className="text-xl font-extrabold text-white mt-0.5 leading-snug">{viewingEvent.title}</h3>
-									</div>
-								</div>
-
-								{/* Event Details Content */}
-								<div className="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-12rem)] scrollbar-thin scrollbar-thumb-zinc-800">
-									
-									{/* Digital ID Pass Card */}
-									<div className="border border-dashed border-zinc-700 bg-zinc-950 p-4 font-mono space-y-3 text-center rounded-none relative overflow-hidden flex flex-col items-center">
-										{/* Left ticket cutout */}
-										<div className="absolute -left-2 top-1/2 -translate-y-1/2 size-4 rounded-full bg-zinc-900 border border-zinc-800" />
-										{/* Right ticket cutout */}
-										<div className="absolute -right-2 top-1/2 -translate-y-1/2 size-4 rounded-full bg-zinc-900 border border-zinc-800" />
-										
-										{/* Ticket Thumbnail Image */}
-										{viewingEvent.imageUrl && (
-											<div className="w-full h-24 overflow-hidden relative border border-zinc-800/80 mb-1 shrink-0">
-												<img 
-													src={viewingEvent.imageUrl} 
-													alt={viewingEvent.title} 
-													className="h-full w-full object-cover opacity-90" 
-												/>
-												<div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
-											</div>
-										)}
-
-										<div className="space-y-1.5 w-full">
-											<span className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold block">Official Reference Pass</span>
-											<strong className="text-white text-sm md:text-base tracking-wider block font-bold truncate">
-												EVT-REG-{viewingEvent.id.slice(0, 8).toUpperCase()}-{employee.id.toUpperCase()}
-											</strong>
-											<span className="text-[9px] text-zinc-550 block">This ID serves as your digital clearance reference for this event.</span>
-										</div>
-									</div>
-
-									{/* Description */}
-									<div className="space-y-1">
-										<h4 className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider font-mono">Description</h4>
-										<p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">{viewingEvent.description}</p>
-									</div>
-
-									{/* Timings Grid */}
-									<div className="grid grid-cols-2 gap-4 border-t border-b border-zinc-800 py-3 text-xs">
-										<div className="space-y-1">
-											<span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider font-mono">Start Schedule</span>
-											<p className="text-zinc-200 font-medium">{fmt(startD)} at {viewingEvent.startTime}</p>
-										</div>
-										<div className="space-y-1">
-											<span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider font-mono">End Schedule</span>
-											<p className="text-zinc-200 font-medium">{fmt(endD)} at {viewingEvent.endTime}</p>
-										</div>
-									</div>
-
-									{/* Venue */}
-									<div className="space-y-1 text-xs">
-										<span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider font-mono">Venue / Location</span>
-										<p className="text-zinc-200 leading-relaxed flex items-start gap-1.5">
-											<MapPinIcon className="size-3.5 mt-0.5 text-zinc-500 shrink-0" />
-											{viewingEvent.venueAddress}
-										</p>
-									</div>
-
-									{/* Representatives */}
-									{reps.length > 0 && (
-										<div className="space-y-2 pt-2">
-											<span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider font-mono block">Company Representatives</span>
-											<div className="flex flex-wrap gap-1.5">
-												{reps.map((r, i) => (
-													<span key={i} className={`text-xs px-2 py-0.5 border ${
-														reps.some(rep => rep.name === `${employee.firstName} ${employee.lastName}`)
-															? 'bg-brand-950/40 border-brand-900/40 text-brand-300'
-															: 'bg-zinc-800/60 border-zinc-700/60 text-zinc-300'
-													}`}>
-														{r.name}
-														{r.name === `${employee.firstName} ${employee.lastName}` && (
-															<span className="ml-1 text-brand-400 font-bold">· You</span>
-														)}
-													</span>
-												))}
-											</div>
-										</div>
-									)}
-								</div>
-								
-								{/* Close Footer Action */}
-								<div className="p-4 bg-zinc-950/40 border-t border-zinc-800 flex justify-end">
-									<button 
-										onClick={() => setViewingEvent(null)}
-										className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-semibold px-5 py-2.5 cursor-pointer transition-colors"
-									>
-										Dismiss Details
-									</button>
-								</div>
-							</div>
-						</div>
-					);
-				})()}
 
 			{/* TAB: WORK SUBMISSION */}
 				{activeTab === 'work_submission' && (
