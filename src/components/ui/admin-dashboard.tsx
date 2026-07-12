@@ -17,7 +17,7 @@ import {
 	UserPlusIcon,
 	PlusIcon,
 } from 'lucide-react';
-import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents, getHrCompanies, createHrCompany, updateHrCompany, deleteHrCompany, triggerHrCompaniesCrawl, allowHrCompany, allowAllHrCompanies, deleteAllCrawledHrCompanies } from '@/app/admin/actions';
+import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents, getHrCompanies, createHrCompany, updateHrCompany, deleteHrCompany, triggerHrCompaniesCrawl, allowHrCompany, allowAllHrCompanies, deleteAllCrawledHrCompanies, bulkImportEmployees } from '@/app/admin/actions';
 import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon, PencilIcon, CheckIcon, XIcon, EyeIcon, CopyIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessagesView } from './messages-view';
@@ -139,6 +139,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	// Employee Directory States
 	const [employeesList, setEmployeesList] = useState<any[]>([]);
 	const [showAddForm, setShowAddForm] = useState(false);
+	const [showExportDropdown, setShowExportDropdown] = useState(false);
 	const [firstName, setFirstName] = useState('');
 	const [middleName, setMiddleName] = useState('');
 	const [lastName, setLastName] = useState('');
@@ -883,6 +884,216 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 		} finally {
 			setIsAdding(false);
 		}
+	};
+
+	const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		setAddMessage(null);
+		setIsAdding(true);
+
+		try {
+			const text = await file.text();
+
+			// Parse CSV
+			const lines = text.split(/\r?\n/);
+			if (lines.length < 2) {
+				setAddMessage({ type: 'error', text: 'file is empty or missing data rows' });
+				setIsAdding(false);
+				return;
+			}
+
+			// Parse headers
+			const headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, '').toLowerCase());
+
+			// Map indices
+			const getIndex = (aliases: string[]) => {
+				return headers.findIndex(h => aliases.includes(h));
+			};
+
+			const firstIdx = getIndex(['firstname', 'first name', 'first_name']);
+			const middleIdx = getIndex(['middlename', 'middle name', 'middle_name']);
+			const lastIdx = getIndex(['lastname', 'last name', 'last_name']);
+			const emailIdx = getIndex(['email', 'email id', 'email_id', 'emailaddress', 'email address']);
+			const phoneIdx = getIndex(['phone', 'phone number', 'phone_number', 'mobile', 'cell']);
+			const wingIdx = getIndex(['wing', 'wingname', 'wing name', 'wing_name']);
+			const wingLeadIdx = getIndex(['winglead', 'wing lead', 'wing lead name', 'wing_lead_name']);
+			const roleIdx = getIndex(['role', 'role name', 'designation']);
+
+			const parsedEmployees: any[] = [];
+
+			for (let i = 1; i < lines.length; i++) {
+				const line = lines[i].trim();
+				if (!line) continue;
+
+				// Simple CSV row parser (handles quotes and commas)
+				const values: string[] = [];
+				let current = '';
+				let inQuotes = false;
+
+				for (let j = 0; j < line.length; j++) {
+					const char = line[j];
+					if (char === '"') {
+						inQuotes = !inQuotes;
+					} else if (char === ',' && !inQuotes) {
+						values.push(current.trim());
+						current = '';
+					} else {
+						current += char;
+					}
+				}
+				values.push(current.trim());
+
+				// Extract fields using mapped indices or default index fallback
+				const getVal = (idx: number, fallbackIdx: number) => {
+					const activeIdx = idx !== -1 ? idx : fallbackIdx;
+					if (activeIdx < values.length) {
+						return values[activeIdx].replace(/^["']|["']$/g, '').trim();
+					}
+					return '';
+				};
+
+				const firstNameVal = getVal(firstIdx, 0);
+				const middleNameVal = getVal(middleIdx, 1);
+				const lastNameVal = getVal(lastIdx, 2);
+				const emailVal = getVal(emailIdx, 3);
+				const phoneVal = getVal(phoneIdx, 4);
+				const wingNameVal = getVal(wingIdx, 5);
+				const wingLeadNameVal = getVal(wingLeadIdx, 6);
+				const roleVal = getVal(roleIdx, 7);
+
+				if (firstNameVal && lastNameVal && emailVal) {
+					parsedEmployees.push({
+						firstName: firstNameVal,
+						middleName: middleNameVal || undefined,
+						lastName: lastNameVal,
+						email: emailVal,
+						phone: phoneVal || 'n/a',
+						wingName: wingNameVal || 'general',
+						wingLeadName: wingLeadNameVal || 'admin',
+						role: roleVal || 'employee'
+					});
+				}
+			}
+
+			if (parsedEmployees.length === 0) {
+				setAddMessage({ type: 'error', text: 'no valid employee rows found in file (ensure first name, last name, and email are present)' });
+				setIsAdding(false);
+				return;
+			}
+
+			const res = await bulkImportEmployees(parsedEmployees);
+			if (res.success) {
+				setAddMessage({ type: 'success', text: `successfully imported ${res.count} employees!` });
+				await fetchEmployees();
+				await fetchStats();
+			} else {
+				setAddMessage({ type: 'error', text: res.error || 'import failed' });
+			}
+		} catch (err: any) {
+			setAddMessage({ type: 'error', text: `parse error: ${err.message}` });
+		} finally {
+			setIsAdding(false);
+			e.target.value = '';
+		}
+	};
+
+	const handleExportPdf = () => {
+		const printWindow = window.open('', '_blank');
+		if (!printWindow) {
+			alert('please allow popups to export pdf');
+			return;
+		}
+
+		// Create table headers and rows in lowercase/normal case (no caps)
+		const headers = ['employee id', 'full name', 'email id', 'phone', 'wing', 'wing lead', 'role'];
+
+		const rows = employeesList.map(emp => {
+			const fullName = `${emp.firstName} ${emp.middleName ? emp.middleName + ' ' : ''}${emp.lastName}`;
+			return [
+				emp.id.toLowerCase(),
+				fullName.toLowerCase(),
+				emp.email.toLowerCase(),
+				emp.phone.toLowerCase(),
+				emp.wingName.toLowerCase(),
+				emp.wingLeadName.toLowerCase(),
+				(emp.role || 'employee').toLowerCase()
+			];
+		});
+
+		const headersHtml = headers.map(h => `<th style="padding: 10px; border-bottom: 2px solid #ddd; text-align: left; font-size: 11px; color: #555; text-transform: lowercase;">${h}</th>`).join('');
+
+		const rowsHtml = rows.map(row => {
+			return `<tr>
+				${row.map(val => `<td style="padding: 10px; border-bottom: 1px solid #eee; font-size: 11px; color: #333; text-transform: lowercase;">${val}</td>`).join('')}
+			</tr>`;
+		}).join('');
+
+		const htmlContent = `
+			<html>
+				<head>
+					<title>employee directory</title>
+					<style>
+						body {
+							font-family: sans-serif;
+							margin: 40px;
+							color: #333;
+							background: #fff;
+							text-transform: lowercase;
+						}
+						h1 {
+							font-size: 20px;
+							margin-bottom: 20px;
+							color: #111;
+							font-weight: 600;
+							border-bottom: 1px solid #eee;
+							padding-bottom: 10px;
+							text-transform: lowercase;
+						}
+						table {
+							width: 100%;
+							border-collapse: collapse;
+							margin-top: 10px;
+						}
+						tr:nth-child(even) {
+							background-color: #fafafa;
+						}
+						@media print {
+							body {
+								margin: 20px;
+							}
+							button {
+								display: none;
+							}
+						}
+					</style>
+				</head>
+				<body>
+					<h1>employee directory</h1>
+					<table>
+						<thead>
+							<tr>
+								${headersHtml}
+							</tr>
+						</thead>
+						<tbody>
+							${rowsHtml}
+						</tbody>
+					</table>
+					<script>
+						window.onload = function() {
+							setTimeout(function() {
+								window.print();
+							}, 500);
+						};
+					</script>
+				</body>
+			</html>
+		`;
+
+		printWindow.document.write(htmlContent);
+		printWindow.document.close();
 	};
 
 	const handleCreateTask = async (e: React.FormEvent) => {
@@ -1929,20 +2140,63 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 								<UsersIcon className="size-5 text-brand-400" />
 								<h2 className="text-lg font-bold text-white">Employee Directory</h2>
 							</div>
-							<Button
-								onClick={() => {
-									setShowAddForm(!showAddForm);
-									setAddMessage(null);
-								}}
-								className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-none h-auto cursor-pointer"
-							>
-								{showAddForm ? 'Cancel Registration' : (
-									<>
-										<UserPlusIcon className="size-4 me-2 inline" />
-										Add New Employee
-									</>
-								)}
-							</Button>
+							<div className="flex items-center gap-3">
+								<input
+									id="employee-excel-import"
+									type="file"
+									accept=".csv"
+									className="hidden"
+									onChange={handleImportExcel}
+								/>
+								<div className="relative" onMouseLeave={() => setShowExportDropdown(false)}>
+									<Button
+										onClick={() => setShowExportDropdown(!showExportDropdown)}
+										className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold py-2 px-4 rounded-none h-auto cursor-pointer flex items-center gap-1.5 border border-zinc-700"
+									>
+										<UploadIcon className="size-3.5 text-brand-400" />
+										export data <span className="text-[9px]">▼</span>
+									</Button>
+									{showExportDropdown && (
+										<div className="absolute right-0 mt-1 w-40 bg-zinc-950 border border-zinc-850 shadow-xl z-50 py-1 font-mono text-[11px]">
+											<button
+												type="button"
+												onClick={() => {
+													setShowExportDropdown(false);
+													document.getElementById('employee-excel-import')?.click();
+												}}
+												className="w-full text-left px-4 py-2 text-zinc-350 hover:bg-zinc-900 hover:text-white transition-colors cursor-pointer"
+											>
+												import excel
+											</button>
+											<button
+												type="button"
+												onClick={() => {
+													setShowExportDropdown(false);
+													handleExportPdf();
+												}}
+												className="w-full text-left px-4 py-2 text-zinc-350 hover:bg-zinc-900 hover:text-white transition-colors cursor-pointer"
+											>
+												import into pdf
+											</button>
+										</div>
+									)}
+								</div>
+
+								<Button
+									onClick={() => {
+										setShowAddForm(!showAddForm);
+										setAddMessage(null);
+									}}
+									className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-none h-auto cursor-pointer"
+								>
+									{showAddForm ? 'Cancel Registration' : (
+										<>
+											<UserPlusIcon className="size-4 me-2 inline" />
+											Add New Employee
+										</>
+									)}
+								</Button>
+							</div>
 						</div>
 
 						{/* Notification message */}

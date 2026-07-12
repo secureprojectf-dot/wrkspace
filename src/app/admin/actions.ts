@@ -2130,3 +2130,83 @@ export async function triggerHrCompaniesCrawl(city: string): Promise<{ success: 
     return { success: false, error: error.message };
   }
 }
+
+export async function bulkImportEmployees(employees: {
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  wingName: string;
+  wingLeadName: string;
+  role?: string;
+}[]) {
+  try {
+    // To ensure unique random IDs, we'll fetch existing employee IDs
+    const existingEmployees = await db.employee.findMany({
+      select: { id: true }
+    });
+    const existingIds = new Set(existingEmployees.map(e => e.id));
+    
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const generateUniqueId = () => {
+      let attempts = 0;
+      while (attempts < 1000) {
+        let id = '';
+        for (let i = 0; i < 6; i++) {
+          id += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        if (!existingIds.has(id)) {
+          existingIds.add(id);
+          return id;
+        }
+        attempts++;
+      }
+      throw new Error('Could not generate a unique employee ID.');
+    };
+
+    let successCount = 0;
+    const errors: string[] = [];
+
+    for (const emp of employees) {
+      if (!emp.email || !emp.firstName || !emp.lastName) {
+        errors.push(`Skipped row: missing required fields`);
+        continue;
+      }
+      
+      try {
+        const id = generateUniqueId();
+        await db.employee.create({
+          data: {
+            id,
+            firstName: emp.firstName,
+            middleName: emp.middleName || null,
+            lastName: emp.lastName,
+            email: emp.email.toLowerCase(),
+            phone: emp.phone || '',
+            wingName: emp.wingName || 'General',
+            wingLeadName: emp.wingLeadName || 'Admin',
+            role: emp.role || 'Employee'
+          }
+        });
+        successCount++;
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          errors.push(`Email already exists: ${emp.email}`);
+        } else {
+          errors.push(`Error saving ${emp.email}: ${err.message}`);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      count: successCount,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  } catch (error: any) {
+    console.error('Error in bulkImportEmployees:', error);
+    return { success: false, error: error.message };
+  }
+}
+
