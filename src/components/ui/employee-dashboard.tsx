@@ -1151,7 +1151,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 									return (
 										<div key={event.id} className="bg-zinc-900/30 border border-zinc-800/80 flex flex-col hover:border-brand-900/60 transition-all duration-305 shadow-lg group relative">
 											{/* Image Banner */}
-											<div className="h-40 w-full relative overflow-hidden bg-zinc-950">
+											<div className="h-40 w-full relative overflow-hidden bg-zinc-950 flex items-center justify-center border-b border-zinc-800/50">
 												{event.imageUrl ? (
 													<img 
 														src={event.imageUrl} 
