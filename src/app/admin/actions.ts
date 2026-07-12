@@ -523,6 +523,72 @@ export async function sendEmployeeIdByEmail(email: string) {
   }
 }
 
+async function sendTaskEmail(
+  toEmail: string,
+  taskTitle: string,
+  taskDesc: string,
+  deadline: Date,
+  allocatorName: string,
+  allocatorRole: string
+) {
+  try {
+    const transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: 'forgedigitaltechnologies@gmail.com',
+        pass: 'grty hjnq zdvh mjwx',
+      },
+    });
+
+    const logoUrl = 'https://ik.imagekit.io/dypkhqxip/logogog';
+    const formattedDeadline = deadline.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    await transporter.sendMail({
+      from: '"WrkSpace Task Allocation" <forgedigitaltechnologies@gmail.com>',
+      to: toEmail,
+      subject: `New Task Assigned: ${taskTitle}`,
+      html: `
+        <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e4e4e7; background-color: #ffffff;">
+          <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid #e4e4e7; padding-bottom: 16px;">
+            <img src="${logoUrl}" alt="WrkSpace Logo" style="height: 40px; width: auto; max-width: 100%;" />
+          </div>
+          <h2 style="color: #4f46e5; font-size: 20px; font-weight: 700; margin-top: 0; margin-bottom: 8px;">New Task Allocated</h2>
+          <p style="color: #4b5563; font-size: 14px; margin-top: 0; margin-bottom: 20px;">A new task has been assigned to you in the WrkSpace system. Below are the details:</p>
+          
+          <div style="background-color: #f9fafb; border: 1px solid #f3f4f6; padding: 16px; margin-bottom: 20px;">
+            <div style="margin-bottom: 12px;">
+              <span style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px;">Task Title</span>
+              <strong style="font-size: 15px; color: #1f2937; display: block;">${taskTitle}</strong>
+            </div>
+            <div style="margin-bottom: 12px;">
+              <span style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px;">Description</span>
+              <span style="font-size: 13px; color: #4b5563; display: block; line-height: 1.5; white-space: pre-line;">${taskDesc}</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+              <span style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px;">Assigned By</span>
+              <span style="font-size: 13px; color: #1f2937; display: block; font-weight: 600;">${allocatorName} (${allocatorRole})</span>
+            </div>
+            <div>
+              <span style="font-size: 11px; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 2px;">Deadline</span>
+              <span style="font-size: 13px; color: #e11d48; display: block; font-weight: 600;">${formattedDeadline}</span>
+            </div>
+          </div>
+
+          <p style="color: #4b5563; font-size: 14px; margin-bottom: 0;">Please log into your Employee Dashboard to view task guidelines and update your progress.</p>
+        </div>
+      `
+    });
+  } catch (error) {
+    console.error('Failed to send task email:', error);
+  }
+}
+
 export async function createTask(data: {
   title: string;
   description: string;
@@ -550,6 +616,39 @@ export async function createTask(data: {
         allocatorRole: data.allocatorRole,
       }
     });
+
+    // Send email asynchronously in the background so it doesn't block the UI
+    if (data.assigneeId === 'ALL') {
+      db.employee.findMany().then(employees => {
+        employees.forEach(emp => {
+          if (emp.email) {
+            sendTaskEmail(
+              emp.email,
+              data.title,
+              data.description,
+              new Date(data.deadline),
+              data.allocatorName || 'Admin',
+              data.allocatorRole || 'Admin'
+            ).catch(err => console.error('Failed to send task email to ' + emp.email, err));
+          }
+        });
+      }).catch(err => console.error('Failed to query employees for bulk task email', err));
+    } else {
+      db.employee.findUnique({
+        where: { id: data.assigneeId }
+      }).then(emp => {
+        if (emp && emp.email) {
+          sendTaskEmail(
+            emp.email,
+            data.title,
+            data.description,
+            new Date(data.deadline),
+            data.allocatorName || 'Admin',
+            data.allocatorRole || 'Admin'
+          ).catch(err => console.error('Failed to send task email to ' + emp.email, err));
+        }
+      }).catch(err => console.error('Failed to query employee for task email', err));
+    }
 
     return { success: true, task };
   } catch (error: any) {
