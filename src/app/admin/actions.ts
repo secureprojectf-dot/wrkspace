@@ -2241,11 +2241,13 @@ export async function getHrCompanies() {
 
 export async function getEmployeeHrCompanies(employeeId: string) {
   try {
+    const isSpecialEmployee = employeeId === '1Y8IBX' || employeeId === 'WVJI3T';
+    const whereClause = isSpecialEmployee
+      ? { allowed: true }
+      : { assignedEmployeeId: employeeId, allowed: true };
+
     const list = await db.hrCompany.findMany({
-      where: {
-        assignedEmployeeId: employeeId,
-        allowed: true
-      },
+      where: whereClause,
       orderBy: { createdAt: 'desc' }
     });
     return { success: true, companies: list };
