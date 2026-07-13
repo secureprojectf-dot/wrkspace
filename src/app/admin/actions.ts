@@ -387,6 +387,7 @@ export async function getLiveSystemStats() {
   let leadCount = 0;
 
   try {
+    await runAutoCheckOut();
     admin = await getOrCreateAdmin();
     employeeCount = await db.employee.count();
     taskCount = await db.task.count();
@@ -868,6 +869,7 @@ export async function updateLeaveStatus(leaveId: string, status: string) {
 
 export async function getEmployeeAttendance(employeeId: string) {
   try {
+    await runAutoCheckOut();
     const logs = await db.attendance.findMany({
       where: { employeeId },
       orderBy: { createdAt: 'desc' }
@@ -881,6 +883,7 @@ export async function getEmployeeAttendance(employeeId: string) {
 
 export async function getAllAttendance() {
   try {
+    await runAutoCheckOut();
     const logs = await db.attendance.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -898,8 +901,42 @@ function getISTDateAndTime() {
   return { todayStr, timeStr };
 }
 
+export async function runAutoCheckOut() {
+  try {
+    const { todayStr } = getISTDateAndTime();
+    const now = new Date();
+    
+    // Get time in Asia/Kolkata in HH:MM format (24-hour clock)
+    const istTimeStr = now.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false });
+    const [istHour, istMinute] = istTimeStr.split(':').map(Number);
+    const isPastSixThirtyPM = (istHour > 18) || (istHour === 18 && istMinute >= 30);
+
+    const activeLogs = await db.attendance.findMany({
+      where: {
+        checkOut: null
+      }
+    });
+
+    for (const log of activeLogs) {
+      if (log.date < todayStr || (log.date === todayStr && isPastSixThirtyPM)) {
+        await db.attendance.update({
+          where: { id: log.id },
+          data: {
+            checkOut: "06:30 PM",
+            status: "Present"
+          }
+        });
+        console.log(`Auto checked out log ID: ${log.id} for employee: ${log.employeeName} on ${log.date}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error in runAutoCheckOut:', error);
+  }
+}
+
 export async function getCurrentAttendanceStatus(employeeId: string) {
   try {
+    await runAutoCheckOut();
     const { todayStr } = getISTDateAndTime();
     const activeLog = await db.attendance.findFirst({
       where: {
@@ -917,6 +954,7 @@ export async function getCurrentAttendanceStatus(employeeId: string) {
 
 export async function clockIn(employeeId: string, employeeName: string) {
   try {
+    await runAutoCheckOut();
     const { todayStr, timeStr } = getISTDateAndTime();
 
     const existing = await db.attendance.findFirst({
