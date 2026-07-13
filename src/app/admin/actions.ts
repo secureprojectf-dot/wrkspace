@@ -913,7 +913,10 @@ export async function runAutoCheckOut() {
 
     const activeLogs = await db.attendance.findMany({
       where: {
-        checkOut: null
+        OR: [
+          { checkOut: null },
+          { status: "Checked In" }
+        ]
       }
     });
 
