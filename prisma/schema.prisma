@@ -56,6 +56,10 @@ model Employee {
   photoUrl     String?
   /// Admin-uploaded employee ID card image (data URL or https)
   idCardUrl    String?
+  /// Last known device location (continuous while app monitors / on shift)
+  lastLat      Float?
+  lastLng      Float?
+  lastLocationAt DateTime?
   sosIncidents SosIncident[]
   safetyTrips  SafetyTrip[]
 }

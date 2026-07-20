@@ -1,11 +1,12 @@
 import { db } from '@/lib/db';
 import { notifyPush } from '@/lib/push-notify';
+import { emitAttendanceUpdate } from '@/lib/realtime-emit';
 
 const DAY_CHECKOUT_LABEL = '06:30 PM';
 const DAY_CHECKOUT_MINUTES = 18 * 60 + 30;
-const EVENING_CHECKOUT_LABEL = '09:30 PM';
-const EVENING_CHECKOUT_MINUTES = 21 * 60 + 30;
-/** Minutes before cutoff to send “still checked in” reminder. */
+const LATE_START_MINUTES = 21 * 60 + 30; // 9:30 PM IST
+const FORCE_CLOSE_MINUTES = 24 * 60; // midnight → force previous/today leftovers
+/** Minutes before day cutoff to send reminder. */
 const REMINDER_LEAD_MINUTES = 15;
 
 function todayStrIST() {
@@ -38,13 +39,54 @@ function parseTimeLabelToMinutes(label: string | null | undefined): number | nul
 	return h * 60 + min;
 }
 
-export function checkoutPolicyForLog(log: { checkIn?: string | null }) {
+function formatMinsLabel(mins: number) {
+	const clamped = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+	let h = Math.floor(clamped / 60);
+	const m = clamped % 60;
+	const ap = h >= 12 ? 'PM' : 'AM';
+	h = h % 12;
+	if (h === 0) h = 12;
+	return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ap}`;
+}
+
+/**
+ * Checkout policy:
+ * - Day shift (check-in before 6:30 PM) → auto out at 6:30 PM
+ * - Still open after 9:30 PM → auto out (and every hour until midnight for late check-ins)
+ * - At/after midnight → force-close any leftover open session
+ */
+export function checkoutDecisionForLog(
+	log: { checkIn?: string | null; date: string },
+	todayStr: string,
+	nowMins: number,
+): { shouldClose: boolean; label: string; reason: string } | null {
 	const checkInMins = parseTimeLabelToMinutes(log.checkIn);
-	const eveningSession = checkInMins != null && checkInMins >= DAY_CHECKOUT_MINUTES;
-	if (eveningSession) {
-		return { label: EVENING_CHECKOUT_LABEL, cutoffMins: EVENING_CHECKOUT_MINUTES };
+	const eveningCheckIn = checkInMins != null && checkInMins >= DAY_CHECKOUT_MINUTES;
+
+	// Previous calendar days still open → force close (covers midnight sweep)
+	if (log.date < todayStr) {
+		return { shouldClose: true, label: '12:00 AM', reason: 'force_midnight_prev' };
 	}
-	return { label: DAY_CHECKOUT_LABEL, cutoffMins: DAY_CHECKOUT_MINUTES };
+
+	if (log.date !== todayStr) return null;
+
+	// After 9:30 PM: auto-checkout everyone still open (hourly crons catch late re-check-ins until midnight)
+	if (nowMins >= LATE_START_MINUTES) {
+		const hourBucket = Math.floor(nowMins / 60) * 60 + 30; // …:30 labels
+		const labelMins = Math.max(LATE_START_MINUTES, Math.min(hourBucket, 23 * 60 + 30));
+		return {
+			shouldClose: true,
+			label: formatMinsLabel(labelMins),
+			reason: 'late_hourly',
+		};
+	}
+
+	// Day shift cutoff 6:30 PM (skip if they only checked in after 6:30)
+	if (!eveningCheckIn && nowMins >= DAY_CHECKOUT_MINUTES) {
+		return { shouldClose: true, label: DAY_CHECKOUT_LABEL, reason: 'day_630' };
+	}
+
+	return null;
 }
 
 function isOpenSession(log: { checkOut?: string | null; status?: string | null }) {
@@ -54,14 +96,19 @@ function isOpenSession(log: { checkOut?: string | null; status?: string | null }
 }
 
 /**
- * Near-checkout reminders + auto check-out with FCM.
- * Safe to call from cron and from attendance API paths.
+ * Near-checkout reminders + staged auto check-out with FCM.
  */
 export async function processAttendanceCheckoutJobs(opts?: { notify?: boolean }) {
 	const notify = opts?.notify !== false;
 	const todayStr = todayStrIST();
 	const nowMins = nowMinutesIST();
-	const result = { reminded: 0, autoCheckedOut: 0, skipped: 0 };
+	const result = {
+		reminded: 0,
+		autoCheckedOut: 0,
+		skipped: 0,
+		nowMins,
+		todayStr,
+	};
 
 	const activeLogs = await db.attendance.findMany({
 		where: {
@@ -76,40 +123,44 @@ export async function processAttendanceCheckoutJobs(opts?: { notify?: boolean })
 			continue;
 		}
 
-		const policy = checkoutPolicyForLog(log);
-		const shouldClose =
-			log.date < todayStr || (log.date === todayStr && nowMins >= policy.cutoffMins);
-
-		if (shouldClose) {
-			await db.attendance.update({
+		const decision = checkoutDecisionForLog(log, todayStr, nowMins);
+		if (decision?.shouldClose) {
+			const row = await db.attendance.update({
 				where: { id: log.id },
 				data: {
-					checkOut: policy.label,
+					checkOut: decision.label,
 					status: 'Present',
 					checkoutReminderSent: true,
 				},
 			});
 			result.autoCheckedOut++;
+			void emitAttendanceUpdate(log.employeeId, row, 'auto-check-out');
 			if (notify) {
 				void notifyPush({
 					title: 'Auto checked out',
-					body: `You were checked out at ${policy.label} (${log.date}).`,
+					body: `You were checked out at ${decision.label} (${log.date}).`,
 					employeeId: log.employeeId,
 					data: {
 						type: 'attendance',
 						action: 'auto_checkout',
 						date: log.date,
-						checkOut: policy.label,
+						checkOut: decision.label,
+						reason: decision.reason,
 					},
 				}).catch((e) => console.error('[attendance] auto-checkout push', e));
 			}
 			continue;
 		}
 
-		// Near-checkout reminder (same day, from T-15 until cutoff; once via flag)
-		const remindAt = policy.cutoffMins - REMINDER_LEAD_MINUTES;
+		// Near 6:30 PM reminder for day-shift open sessions
+		const checkInMins = parseTimeLabelToMinutes(log.checkIn);
+		const eveningCheckIn = checkInMins != null && checkInMins >= DAY_CHECKOUT_MINUTES;
+		const remindAt = DAY_CHECKOUT_MINUTES - REMINDER_LEAD_MINUTES;
 		const inReminderWindow =
-			log.date === todayStr && nowMins >= remindAt && nowMins < policy.cutoffMins;
+			log.date === todayStr &&
+			!eveningCheckIn &&
+			nowMins >= remindAt &&
+			nowMins < DAY_CHECKOUT_MINUTES;
 
 		if (!inReminderWindow) continue;
 		if (log.checkoutReminderSent) continue;
@@ -122,17 +173,27 @@ export async function processAttendanceCheckoutJobs(opts?: { notify?: boolean })
 		if (notify) {
 			void notifyPush({
 				title: 'Checkout reminder',
-				body: `Still checked in — checkout by ${policy.label} (in ~${REMINDER_LEAD_MINUTES} min).`,
+				body: `Still checked in — checkout by ${DAY_CHECKOUT_LABEL} (in ~${REMINDER_LEAD_MINUTES} min).`,
 				employeeId: log.employeeId,
 				data: {
 					type: 'attendance',
 					action: 'checkout_reminder',
 					date: log.date,
-					checkOutDue: policy.label,
+					checkOutDue: DAY_CHECKOUT_LABEL,
 				},
 			}).catch((e) => console.error('[attendance] reminder push', e));
 		}
 	}
 
 	return result;
+}
+
+/** Kept for older imports */
+export function checkoutPolicyForLog(log: { checkIn?: string | null }) {
+	const checkInMins = parseTimeLabelToMinutes(log.checkIn);
+	const eveningSession = checkInMins != null && checkInMins >= DAY_CHECKOUT_MINUTES;
+	if (eveningSession) {
+		return { label: '09:30 PM', cutoffMins: LATE_START_MINUTES };
+	}
+	return { label: DAY_CHECKOUT_LABEL, cutoffMins: DAY_CHECKOUT_MINUTES };
 }

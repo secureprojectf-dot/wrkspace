@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
 		const push = await notifyPush({
 			title: 'Leaving office area',
-			body: 'Choose within 5 min: Office work (stay checked in) or Going home. No reply → auto check-out.',
+			body: 'Choose within 5 min: Office work (stay checked in) or Going home / check out. No reply → auto check-out.',
 			employeeId: user.sub,
 			data: {
 				type: 'office_exit',
