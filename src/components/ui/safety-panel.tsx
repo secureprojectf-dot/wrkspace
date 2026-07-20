@@ -169,6 +169,25 @@ export function EmployeeSafetyPanel({
 	);
 }
 
+function mapsPathUrl(points: { lat: number; lng: number }[]) {
+	if (!points.length) return null;
+	if (points.length === 1) return `https://www.google.com/maps?q=${points[0].lat},${points[0].lng}`;
+	// Sample to stay under Maps URL limits
+	const step = Math.max(1, Math.ceil(points.length / 25));
+	const sampled = points.filter((_, i) => i === 0 || i === points.length - 1 || i % step === 0);
+	const path = sampled.map((p) => `${p.lat},${p.lng}`).join('/');
+	return `https://www.google.com/maps/dir/${path}`;
+}
+
+function todayIST() {
+	return new Intl.DateTimeFormat('en-CA', {
+		timeZone: 'Asia/Kolkata',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).format(new Date());
+}
+
 export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 	const [incidents, setIncidents] = useState<any[]>([]);
 	const [trips, setTrips] = useState<any[]>([]);
@@ -177,6 +196,52 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 	const [error, setError] = useState('');
 	const [lastAt, setLastAt] = useState<string | null>(null);
 	const [fcm, setFcm] = useState<{ tokens: number; firebaseConfigured: boolean; ready: boolean } | null>(null);
+	const [histDate, setHistDate] = useState(todayIST());
+	const [histEmployeeId, setHistEmployeeId] = useState('');
+	const [histTrips, setHistTrips] = useState<any[]>([]);
+	const [females, setFemales] = useState<any[]>([]);
+	const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
+	const [histLoading, setHistLoading] = useState(false);
+
+	const loadHistory = async () => {
+		if (!adminEmail) return;
+		setHistLoading(true);
+		try {
+			const qs = new URLSearchParams({
+				email: adminEmail,
+				date: histDate,
+				...(histEmployeeId ? { employeeId: histEmployeeId } : {}),
+				_: String(Date.now()),
+			});
+			const res = await fetch(`/api/admin/safety/trips?${qs}`, {
+				cache: 'no-store',
+				headers: { 'x-admin-email': adminEmail },
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data?.error || 'History load failed');
+			setHistTrips(Array.isArray(data.trips) ? data.trips : []);
+			setFemales(Array.isArray(data.females) ? data.females : []);
+		} catch (e: any) {
+			setError(String(e?.message || e));
+		} finally {
+			setHistLoading(false);
+		}
+	};
+
+	const openTripTrail = async (tripId: string) => {
+		try {
+			const qs = new URLSearchParams({ email: adminEmail, tripId, _: String(Date.now()) });
+			const res = await fetch(`/api/admin/safety/trips?${qs}`, {
+				cache: 'no-store',
+				headers: { 'x-admin-email': adminEmail },
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data?.error || 'Failed to load trail');
+			setSelectedTrip(data.trip || null);
+		} catch (e: any) {
+			setError(String(e?.message || e));
+		}
+	};
 
 	const load = async () => {
 		setRefreshing(true);
@@ -210,7 +275,8 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 	useEffect(() => {
 		if (!adminEmail) return;
 		load();
-		const id = setInterval(load, 8000);
+		loadHistory();
+		const id = setInterval(load, 5000);
 		let stopSocket: (() => void) | undefined;
 		(async () => {
 			try {
@@ -235,6 +301,12 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 		};
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [adminEmail]);
+
+	useEffect(() => {
+		if (!adminEmail) return;
+		void loadHistory();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [histDate, histEmployeeId, adminEmail]);
 
 	return (
 		<div className="space-y-8 text-white">
@@ -372,39 +444,178 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 				</h3>
 				{trips.length === 0 ? (
 					<p className="text-sm text-zinc-400">
-						No active home trips. Appears when a female employee checks out with “Going home”.
+						No active home trips. Appears when a female employee taps “Going home” on mobile (GPS every ~10s).
 					</p>
 				) : (
-					trips.map((t) => (
-						<div key={t.id} className="border border-sky-800/50 bg-sky-950/30 p-4 space-y-2 rounded">
+					trips.map((t) => {
+						const liveLat = t.lat ?? t.points?.[0]?.lat;
+						const liveLng = t.lng ?? t.points?.[0]?.lng;
+						return (
+							<div key={t.id} className="border border-sky-800/50 bg-sky-950/30 p-4 space-y-2 rounded">
+								<p className="font-semibold">
+									{t.employee?.firstName} {t.employee?.lastName}
+									{t.employee?.phone ? (
+										<span className="ml-2 text-xs font-normal text-sky-200">
+											<a href={`tel:${t.employee.phone}`} className="underline">
+												{t.employee.phone}
+											</a>
+										</span>
+									) : null}
+								</p>
+								<p className="text-xs text-zinc-400">
+									Started {new Date(t.startedAt).toLocaleString()}
+									{t.updatedAt ? ` · Last ping ${new Date(t.updatedAt).toLocaleString()}` : ''}
+									{t._count?.points != null ? ` · ${t._count.points} GPS points` : ''}
+								</p>
+								{liveLat != null && liveLng != null ? (
+									<>
+										<p className="text-xs text-zinc-300 font-mono">
+											{Number(liveLat).toFixed(5)}, {Number(liveLng).toFixed(5)}
+										</p>
+										<div className="flex flex-wrap gap-2 pt-1">
+											<a
+												className="inline-flex items-center justify-center rounded-lg bg-sky-600 hover:bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white no-underline"
+												href={`https://www.google.com/maps?q=${liveLat},${liveLng}`}
+												target="_blank"
+												rel="noreferrer"
+											>
+												Open live location
+											</a>
+											<button
+												type="button"
+												className="inline-flex items-center justify-center rounded-lg border border-sky-500/50 px-4 py-2.5 text-sm font-semibold text-sky-100"
+												onClick={() => void openTripTrail(t.id)}
+											>
+												View trail
+											</button>
+										</div>
+									</>
+								) : (
+									<p className="text-xs text-zinc-500">Waiting for first GPS ping…</p>
+								)}
+							</div>
+						);
+					})
+				)}
+			</section>
+
+			<section className="space-y-3 border-t border-zinc-800 pt-6">
+				<h3 className="text-sm font-bold uppercase tracking-wider text-violet-300">
+					Travel history (date-wise)
+				</h3>
+				<p className="text-xs text-zinc-400">
+					Filter by IST date and girl to see where they travelled. Path is stored from mobile GPS pings.
+				</p>
+				<div className="flex flex-wrap gap-3 items-end">
+					<label className="text-xs text-zinc-400 space-y-1">
+						<span className="block">Date (IST)</span>
+						<input
+							type="date"
+							value={histDate}
+							onChange={(e) => setHistDate(e.target.value)}
+							className="bg-zinc-900 border border-zinc-700 text-white text-sm px-3 py-2 rounded"
+						/>
+					</label>
+					<label className="text-xs text-zinc-400 space-y-1">
+						<span className="block">Employee</span>
+						<select
+							value={histEmployeeId}
+							onChange={(e) => setHistEmployeeId(e.target.value)}
+							className="bg-zinc-900 border border-zinc-700 text-white text-sm px-3 py-2 rounded min-w-[200px]"
+						>
+							<option value="">All girls</option>
+							{females.map((f) => (
+								<option key={f.id} value={f.id}>
+									{f.firstName} {f.lastName}
+								</option>
+							))}
+						</select>
+					</label>
+					<button
+						type="button"
+						onClick={() => void loadHistory()}
+						disabled={histLoading}
+						className="rounded-lg border border-violet-500/50 bg-violet-950/40 px-4 py-2 text-sm text-violet-100 disabled:opacity-50"
+					>
+						{histLoading ? 'Loading…' : 'Apply filters'}
+					</button>
+				</div>
+				{histTrips.length === 0 ? (
+					<p className="text-sm text-zinc-500">No trips for this date / filter.</p>
+				) : (
+					histTrips.map((t) => (
+						<div key={t.id} className="border border-violet-900/40 bg-violet-950/20 p-4 space-y-2 rounded">
 							<p className="font-semibold">
-								{t.employee?.firstName} {t.employee?.lastName}
+								{t.employee?.firstName} {t.employee?.lastName}{' '}
+								<span className="text-xs font-normal text-zinc-400">· {t.status}</span>
 							</p>
 							<p className="text-xs text-zinc-400">
-								Started {new Date(t.startedAt).toLocaleString()}
-								{t.updatedAt ? ` · Last ping ${new Date(t.updatedAt).toLocaleString()}` : ''}
+								{new Date(t.startedAt).toLocaleString()}
+								{t.endedAt ? ` → ${new Date(t.endedAt).toLocaleString()}` : ' → in progress'}
+								{t._count?.points != null ? ` · ${t._count.points} points` : ''}
 							</p>
-							{t.lat != null && t.lng != null ? (
-								<>
-									<p className="text-xs text-zinc-300 font-mono">
-										{Number(t.lat).toFixed(5)}, {Number(t.lng).toFixed(5)}
-									</p>
-									<a
-										className="inline-flex items-center justify-center rounded-lg bg-sky-600 hover:bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white no-underline mt-1"
-										href={`https://www.google.com/maps?q=${t.lat},${t.lng}`}
-										target="_blank"
-										rel="noreferrer"
-									>
-										Open live location
-									</a>
-								</>
-							) : (
-								<p className="text-xs text-zinc-500">Waiting for first GPS ping…</p>
-							)}
+							<button
+								type="button"
+								className="inline-flex items-center justify-center rounded-lg bg-violet-600 hover:bg-violet-500 px-4 py-2 text-sm font-semibold text-white"
+								onClick={() => void openTripTrail(t.id)}
+							>
+								View travel path
+							</button>
 						</div>
 					))
 				)}
 			</section>
+
+			{selectedTrip && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+					<div className="w-full max-w-lg max-h-[85vh] overflow-auto border border-zinc-700 bg-zinc-950 p-5 space-y-3 rounded">
+						<div className="flex items-start justify-between gap-3">
+							<div>
+								<h4 className="font-semibold text-white">
+									{selectedTrip.employee?.firstName} {selectedTrip.employee?.lastName}
+								</h4>
+								<p className="text-xs text-zinc-400">
+									{selectedTrip.status} · {(selectedTrip.points || []).length} GPS points
+								</p>
+							</div>
+							<button
+								type="button"
+								className="text-zinc-400 hover:text-white text-sm"
+								onClick={() => setSelectedTrip(null)}
+							>
+								Close
+							</button>
+						</div>
+						{(() => {
+							const pts = (selectedTrip.points || []).map((p: any) => ({
+								lat: Number(p.lat),
+								lng: Number(p.lng),
+							}));
+							const url = mapsPathUrl(pts);
+							return url ? (
+								<a
+									href={url}
+									target="_blank"
+									rel="noreferrer"
+									className="inline-flex w-full items-center justify-center rounded-lg bg-sky-600 hover:bg-sky-500 px-4 py-2.5 text-sm font-semibold text-white no-underline"
+								>
+									Open full path in Google Maps
+								</a>
+							) : (
+								<p className="text-sm text-zinc-500">No GPS points stored for this trip.</p>
+							);
+						})()}
+						<ul className="space-y-1 text-xs font-mono text-zinc-300 max-h-60 overflow-auto">
+							{(selectedTrip.points || []).map((p: any) => (
+								<li key={p.id}>
+									{new Date(p.recordedAt).toLocaleTimeString()} · {Number(p.lat).toFixed(5)},{' '}
+									{Number(p.lng).toFixed(5)}
+								</li>
+							))}
+						</ul>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -53,13 +53,13 @@ export async function findOfficeByToken(rawToken: string) {
   };
 }
 
-export function todayKeyIST() {
+export function todayKeyIST(d: Date = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Kolkata',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
+  }).format(d);
 }
 
 export function nowTimeLabelIST() {

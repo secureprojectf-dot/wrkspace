@@ -81,14 +81,33 @@ model SafetyTrip {
   employeeId  String
   employee    Employee  @relation(fields: [employeeId], references: [id])
   status      String    @default("IN_TRANSIT") // IN_TRANSIT | ARRIVED_HOME | CANCELLED
+  /// IST calendar day key YYYY-MM-DD for date-wise admin filters
+  dateKey     String?
   lat         Float?
   lng         Float?
   startedAt   DateTime  @default(now())
   endedAt     DateTime?
   updatedAt   DateTime  @updatedAt
+  points      SafetyTripPoint[]
 
   @@index([status])
   @@index([employeeId])
+  @@index([dateKey])
+  @@index([employeeId, dateKey])
+}
+
+/// Continuous GPS trail while a girl is going home (admin live + history).
+model SafetyTripPoint {
+  id         String     @id @default(uuid())
+  tripId     String
+  trip       SafetyTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  lat        Float
+  lng        Float
+  recordedAt DateTime   @default(now())
+
+  @@index([tripId])
+  @@index([recordedAt])
+  @@index([tripId, recordedAt])
 }
 
 model Task {

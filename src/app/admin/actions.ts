@@ -1413,19 +1413,26 @@ export async function startGoingHomeTrip(employeeId: string, lat?: number, lng?:
       where: { employeeId, status: 'IN_TRANSIT' },
       data: { status: 'CANCELLED', endedAt: new Date() },
     });
+    const { todayKeyIST } = await import('@/lib/attendance-geo');
+    const { recordTripLocation } = await import('@/lib/safety-trip');
     const trip = await db.safetyTrip.create({
       data: {
         employeeId,
         status: 'IN_TRANSIT',
+        dateKey: todayKeyIST(),
         lat: lat != null && Number.isFinite(lat) ? lat : null,
         lng: lng != null && Number.isFinite(lng) ? lng : null,
       },
     });
+    if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng)) {
+      await recordTripLocation(trip.id, lat, lng);
+    }
+    const fresh = await db.safetyTrip.findUnique({ where: { id: trip.id } });
     try {
       const { emitSafetyUpdate } = await import('@/lib/realtime-emit');
-      void emitSafetyUpdate('trip_started', { employeeId, trip });
+      void emitSafetyUpdate('trip_started', { employeeId, trip: fresh });
     } catch (_) {}
-    return { success: true, trip };
+    return { success: true, trip: fresh };
   } catch (error: any) {
     console.error('Error in startGoingHomeTrip:', error);
     return { success: false, error: error.message || 'Failed to start trip' };
