@@ -61,6 +61,12 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Check-in at office ends any open going-home trip
+    await db.safetyTrip.updateMany({
+      where: { employeeId: emp.id, status: 'IN_TRANSIT' },
+      data: { status: 'CANCELLED', endedAt: new Date() },
+    });
+
     return Response.json({
       attendance: row,
       officeName: office.name,

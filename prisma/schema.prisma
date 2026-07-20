@@ -11,6 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Admin {
@@ -41,6 +42,53 @@ model Employee {
   password     String?
   activeOtp    String?
   otpExpiresAt DateTime?
+  /// UNSPECIFIED | MALE | FEMALE
+  gender       String   @default("UNSPECIFIED")
+  fcmToken     String?
+  homeLat      Float?
+  homeLng      Float?
+  homePlusCode String?
+  homeAddress  String?
+  homeRadiusM  Int      @default(100)
+  /// After first save, false until admin allows a change again
+  homeEditAllowed Boolean @default(true)
+  /// Profile photo as data URL (compressed JPEG) or https URL
+  photoUrl     String?
+  /// Admin-uploaded employee ID card image (data URL or https)
+  idCardUrl    String?
+  sosIncidents SosIncident[]
+  safetyTrips  SafetyTrip[]
+}
+
+model SosIncident {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  status      String    @default("OPEN") // OPEN | RESOLVED
+  lat         Float
+  lng         Float
+  note        String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([employeeId])
+}
+
+model SafetyTrip {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  status      String    @default("IN_TRANSIT") // IN_TRANSIT | ARRIVED_HOME | CANCELLED
+  lat         Float?
+  lng         Float?
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([employeeId])
 }
 
 model Task {
@@ -78,16 +126,33 @@ model Attendance {
   checkIn      String   // e.g. "09:00 AM"
   checkOut     String?  // e.g. "06:00 PM"
   status       String   // e.g. Present, Checked In
+  /// True after near-checkout FCM or auto check-out (dedupe reminders)
+  checkoutReminderSent Boolean @default(false)
   createdAt    DateTime @default(now())
 }
 
 model Message {
-  id           String   @id @default(uuid())
-  channel      String   // e.g. "public", "marketing", "technical", "core", or direct "dm:A:B"
+  id           String            @id @default(uuid())
+  channel      String            // e.g. "public", "marketing", "technical", "core", or direct "dm:A:B"
   senderId     String
   senderName   String
   content      String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime          @default(now())
+  editedAt     DateTime?
+  reactions    MessageReaction[]
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  userName  String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 model ChannelAccessRequest {

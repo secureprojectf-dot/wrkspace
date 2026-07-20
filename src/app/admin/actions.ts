@@ -3,8 +3,14 @@
 import fs from 'fs';
 import path from 'path';
 import nodemailer from 'nodemailer';
+import { unstable_noStore as noStore } from 'next/cache';
 import { db } from '@/lib/db';
 import { exec, execSync } from 'child_process';
+import { notifyPush } from '@/lib/push-notify';
+import { notifyMessagePush } from '@/lib/message-push';
+import { resolveAdminEmployeeIds } from '@/lib/admin-recipients';
+import { processAttendanceCheckoutJobs } from '@/lib/attendance-cron';
+import { eventHasRepresentative, representativeIds } from '@/lib/event-reps';
 
 // Fixed admin email address
 const ADMIN_EMAIL = 'webstrixx@gmail.com';
@@ -44,6 +50,26 @@ export async function loginAdmin(email: string, password: string) {
   }
 
   return { success: false, error: 'Invalid admin credentials' };
+}
+
+/** After Firebase Google sign-in — allow only registered Admin emails. */
+export async function loginAdminWithGoogle(email: string) {
+  try {
+    await getOrCreateAdmin();
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return { success: false as const, error: 'Google account email missing' };
+
+    const admin = await db.admin.findUnique({
+      where: { email: normalized },
+    });
+    if (!admin) {
+      return { success: false as const, error: 'No admin account linked to this Google email' };
+    }
+    return { success: true as const, email: admin.email };
+  } catch (error: any) {
+    console.error('Error in loginAdminWithGoogle:', error);
+    return { success: false as const, error: error.message || 'Google admin login failed' };
+  }
 }
 
 export async function sendOtp(email: string) {
@@ -290,6 +316,7 @@ export async function addEmployee(employeeData: {
   wingName: string;
   wingLeadName: string;
   role?: string;
+  gender?: string;
 }) {
   try {
     // Generate unique 6-digit alphanumeric code
@@ -314,6 +341,10 @@ export async function addEmployee(employeeData: {
       attempts++;
     }
 
+    const genderRaw = String(employeeData.gender || 'UNSPECIFIED').trim().toUpperCase();
+    const gender =
+      genderRaw === 'MALE' || genderRaw === 'FEMALE' ? genderRaw : 'UNSPECIFIED';
+
     const newEmployee = await db.employee.create({
       data: {
         id: generatedId,
@@ -325,6 +356,7 @@ export async function addEmployee(employeeData: {
         wingName: employeeData.wingName,
         wingLeadName: employeeData.wingLeadName,
         role: employeeData.role || "Employee",
+        gender,
       }
     });
 
@@ -352,6 +384,7 @@ export async function getEmployees() {
 
 export async function loginEmployee(email: string, passwordId: string) {
   try {
+    const { signEmployeeToken } = await import('@/lib/api-auth');
     const found = await db.employee.findFirst({
       where: {
         email: { equals: email.toLowerCase() }
@@ -359,14 +392,12 @@ export async function loginEmployee(email: string, passwordId: string) {
     });
 
     if (found) {
-      if (found.password) {
-        if (found.password === passwordId) {
-          return { success: true, employee: found };
-        }
-      } else {
-        if (found.id === passwordId.toUpperCase()) {
-          return { success: true, employee: found };
-        }
+      const ok = found.password
+        ? found.password === passwordId
+        : found.id === passwordId.toUpperCase();
+      if (ok) {
+        const token = signEmployeeToken({ id: found.id, email: found.email, role: found.role });
+        return { success: true, employee: found, token };
       }
     }
   } catch (error) {
@@ -374,6 +405,319 @@ export async function loginEmployee(email: string, passwordId: string) {
   }
 
   return { success: false, error: 'Invalid email address or password/Employee ID' };
+}
+
+/** After Firebase Google sign-in — link Google email to Neon employee row. */
+export async function loginEmployeeWithGoogle(email: string) {
+  try {
+    const { signEmployeeToken } = await import('@/lib/api-auth');
+    const normalized = String(email || '').trim().toLowerCase();
+    if (!normalized) return { success: false as const, error: 'Google account email missing' };
+
+    const found = await db.employee.findFirst({
+      where: { email: { equals: normalized, mode: 'insensitive' } },
+    });
+    if (!found) {
+      return { success: false as const, error: 'No employee linked to this Google account' };
+    }
+    const token = signEmployeeToken({ id: found.id, email: found.email, role: found.role });
+    return { success: true as const, employee: found, token };
+  } catch (error: any) {
+    console.error('Error in loginEmployeeWithGoogle:', error);
+    return { success: false as const, error: error.message || 'Google login failed' };
+  }
+}
+
+/** Admin: upload / clear employee ID card image. */
+export async function updateEmployeeIdCard(employeeId: string, idCardUrl: string | null) {
+  try {
+    const id = String(employeeId || '').trim();
+    if (!id) return { success: false as const, error: 'Employee id required' };
+
+    let next: string | null = null;
+    if (idCardUrl != null && String(idCardUrl).trim()) {
+      const s = String(idCardUrl).trim();
+      if (s.startsWith('data:image/') && s.includes(';base64,')) {
+        if (s.length > 900_000) return { success: false as const, error: 'ID card image too large' };
+        next = s;
+      } else if (/^https?:\/\//i.test(s) && s.length < 2048) {
+        next = s;
+      } else {
+        return { success: false as const, error: 'Invalid ID card image format' };
+      }
+    }
+
+    const employee = await db.employee.update({
+      where: { id },
+      data: { idCardUrl: next },
+    });
+    return { success: true as const, employee };
+  } catch (error: any) {
+    console.error('updateEmployeeIdCard', error);
+    return { success: false as const, error: error.message || 'Failed to save ID card' };
+  }
+}
+
+/** Employee self-service: set/clear profile photo (data URL or https). */
+export async function updateEmployeePhoto(employeeId: string, photoUrl: string | null) {
+  try {
+    const id = String(employeeId || '').trim();
+    if (!id) return { success: false as const, error: 'Employee id required' };
+
+    let next: string | null = null;
+    if (photoUrl != null && String(photoUrl).trim()) {
+      const s = String(photoUrl).trim();
+      if (s.startsWith('data:image/') && s.includes(';base64,')) {
+        if (s.length > 450_000) return { success: false as const, error: 'Photo too large — try a smaller image' };
+        next = s;
+      } else if (/^https?:\/\//i.test(s) && s.length < 2048) {
+        next = s;
+      } else {
+        return { success: false as const, error: 'Invalid photo format' };
+      }
+    }
+
+    const employee = await db.employee.update({
+      where: { id },
+      data: { photoUrl: next },
+    });
+    return { success: true as const, employee };
+  } catch (error: any) {
+    console.error('updateEmployeePhoto', error);
+    return { success: false as const, error: error.message || 'Failed to save photo' };
+  }
+}
+
+export async function setEmployeeGender(employeeId: string, gender: string) {
+  try {
+    const g = String(gender || '').trim().toUpperCase();
+    if (g !== 'MALE' && g !== 'FEMALE') {
+      return { success: false, error: 'gender must be MALE or FEMALE' };
+    }
+    const employee = await db.employee.update({
+      where: { id: employeeId },
+      data: { gender: g },
+    });
+    return { success: true, employee };
+  } catch (error: any) {
+    console.error('setEmployeeGender', error);
+    return { success: false, error: error.message || 'Failed to save gender' };
+  }
+}
+
+export async function refreshEmployeeSession(employeeId: string) {
+  try {
+    const employee = await db.employee.findUnique({ where: { id: employeeId } });
+    if (!employee) return { success: false as const, error: 'Employee not found' };
+    return { success: true as const, employee };
+  } catch (error: any) {
+    return { success: false as const, error: error.message || 'Failed to refresh' };
+  }
+}
+
+export async function setEmployeeHomeLocation(
+  employeeId: string,
+  data: { lat: number; lng: number; plusCode?: string | null; address?: string | null; homeRadiusM?: number }
+) {
+  try {
+    const lat = Number(data.lat);
+    const lng = Number(data.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { success: false, error: 'lat and lng required' };
+    }
+    const existing = await db.employee.findUnique({ where: { id: employeeId } });
+    if (!existing) return { success: false, error: 'Employee not found' };
+    const hasHome = existing.homeLat != null && existing.homeLng != null;
+    if (hasHome && existing.homeEditAllowed === false) {
+      return {
+        success: false,
+        error: 'Home location is locked. Ask admin to allow a change (yellow Allow home setup).',
+      };
+    }
+    const employee = await db.employee.update({
+      where: { id: employeeId },
+      data: {
+        homeLat: lat,
+        homeLng: lng,
+        homePlusCode: data.plusCode ? String(data.plusCode).slice(0, 32) : null,
+        homeAddress: data.address ? String(data.address).slice(0, 500) : null,
+        homeRadiusM: data.homeRadiusM && data.homeRadiusM > 0 ? Math.round(data.homeRadiusM) : 100,
+        // One-time setup — admin must unlock to change again
+        homeEditAllowed: false,
+      },
+    });
+    return { success: true, employee };
+  } catch (error: any) {
+    console.error('setEmployeeHomeLocation', error);
+    return { success: false, error: error.message || 'Failed to save home' };
+  }
+}
+
+/** Admin: yellow “Allow home setup” — employee can set/change home once more. */
+export async function allowEmployeeHomeSetup(employeeId: string) {
+  try {
+    const employee = await db.employee.update({
+      where: { id: employeeId },
+      data: { homeEditAllowed: true },
+    });
+    return { success: true, employee };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to allow home setup' };
+  }
+}
+
+export async function clearEmployeeHomeLocation(employeeId: string) {
+  try {
+    const employee = await db.employee.update({
+      where: { id: employeeId },
+      data: {
+        homeLat: null,
+        homeLng: null,
+        homePlusCode: null,
+        homeAddress: null,
+        homeEditAllowed: true,
+      },
+    });
+    return { success: true, employee };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to clear home' };
+  }
+}
+
+export async function getFcmPushStatus() {
+  noStore();
+  try {
+    const tokens = await db.employee.count({ where: { fcmToken: { not: null } } });
+    const firebaseConfigured = Boolean(
+      process.env.FIREBASE_SERVICE_ACCOUNT_JSON && String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON).trim()
+    );
+    return {
+      tokens,
+      firebaseConfigured,
+      ready: tokens > 0 && firebaseConfigured,
+    };
+  } catch (error) {
+    console.error('getFcmPushStatus', error);
+    return { tokens: 0, firebaseConfigured: false, ready: false };
+  }
+}
+
+export async function getOpenSosIncidents(_bust?: number) {
+  noStore();
+  try {
+    const rows = await db.sosIncident.findMany({
+      where: { status: 'OPEN' },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        employee: {
+          select: { id: true, firstName: true, lastName: true, email: true, phone: true, gender: true },
+        },
+      },
+    });
+    // Plain JSON so the client always gets a fresh serializable payload
+    return JSON.parse(JSON.stringify(rows)) as typeof rows;
+  } catch (error) {
+    console.error('getOpenSosIncidents', error);
+    return [];
+  }
+}
+
+export async function getLiveSafetyTrips(_bust?: number) {
+  noStore();
+  try {
+    const rows = await db.safetyTrip.findMany({
+      where: { status: 'IN_TRANSIT' },
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        employee: {
+          select: { id: true, firstName: true, lastName: true, email: true, gender: true, phone: true },
+        },
+      },
+    });
+    return JSON.parse(JSON.stringify(rows)) as typeof rows;
+  } catch (error) {
+    console.error('getLiveSafetyTrips', error);
+    return [];
+  }
+}
+
+export async function resolveSosIncident(incidentId: string) {
+  try {
+    const incident = await db.sosIncident.update({
+      where: { id: incidentId },
+      data: { status: 'RESOLVED', resolvedAt: new Date() },
+    });
+    // Tell every employee device + website lists: this SOS is closed.
+    void notifyPush({
+      title: 'SOS resolved',
+      body: 'The emergency alert was closed by admin. You can return to normal.',
+      all: true,
+      data: {
+        type: 'sos_resolved',
+        incidentId: String(incidentId),
+      },
+    });
+    return { success: true, incident };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to resolve' };
+  }
+}
+
+export async function createEmployeeSos(employeeId: string, lat: number, lng: number, note?: string) {
+  try {
+    const emp = await db.employee.findUnique({ where: { id: employeeId } });
+    if (!emp) return { success: false, error: 'Employee not found' };
+    if (String(emp.gender || '').toUpperCase() !== 'FEMALE') {
+      return { success: false, error: 'SOS is only available for female employees' };
+    }
+    await db.sosIncident.updateMany({
+      where: { employeeId, status: 'OPEN' },
+      data: { status: 'RESOLVED', resolvedAt: new Date() },
+    });
+    const incident = await db.sosIncident.create({
+      data: {
+        employeeId,
+        status: 'OPEN',
+        lat,
+        lng,
+        note: note || null,
+      },
+    });
+    const name = `${emp.firstName} ${emp.lastName}`.trim();
+    const phone = String(emp.phone || '').trim();
+    const push = await notifyPush({
+      title: 'SOS — employee needs help',
+      body: `${name}${phone ? ` · ${phone}` : ''} triggered SOS. Open wrkspace for live location.`,
+      all: true,
+      data: {
+        type: 'sos',
+        incidentId: incident.id,
+        employeeId,
+        employeeName: name,
+        phone,
+        lat: String(lat),
+        lng: String(lng),
+      },
+    });
+    return {
+      success: true,
+      push,
+      incident: {
+        ...incident,
+        employee: {
+          id: emp.id,
+          firstName: emp.firstName,
+          lastName: emp.lastName,
+          name,
+          phone,
+          email: emp.email,
+        },
+      },
+    };
+  } catch (error: any) {
+    console.error('createEmployeeSos', error);
+    return { success: false, error: error.message || 'Failed to create SOS' };
+  }
 }
 
 export async function getLiveSystemStats() {
@@ -545,7 +889,7 @@ async function sendTaskEmail(
       },
     });
 
-    const logoUrl = 'https://ik.imagekit.io/dypkhqxip/logogog';
+    const logoUrl = 'https://wrkspace-coral.vercel.app/branding/wrkspace-logo.png';
     const formattedDeadline = deadline.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -622,6 +966,12 @@ export async function createTask(data: {
 
     // Send email asynchronously in the background so it doesn't block the UI
     if (data.assigneeId === 'ALL') {
+      void notifyPush({
+        title: 'New task assigned',
+        body: data.title,
+        all: true,
+        data: { type: 'task', taskId: task.id },
+      });
       db.employee.findMany().then(employees => {
         employees.forEach(emp => {
           if (emp.email) {
@@ -637,6 +987,12 @@ export async function createTask(data: {
         });
       }).catch(err => console.error('Failed to query employees for bulk task email', err));
     } else {
+      void notifyPush({
+        title: 'You have a new task',
+        body: data.title,
+        employeeId: data.assigneeId,
+        data: { type: 'task', taskId: task.id },
+      });
       db.employee.findUnique({
         where: { id: data.assigneeId }
       }).then(emp => {
@@ -822,6 +1178,15 @@ export async function requestLeave(data: {
         status: 'Pending',
       }
     });
+    const adminIds = await resolveAdminEmployeeIds();
+    if (adminIds.length) {
+      void notifyPush({
+        title: 'Leave request',
+        body: `${data.employeeName} requested ${data.type} leave`,
+        employeeIds: adminIds,
+        data: { type: 'leave_request', leaveId: leave.id, employeeId: data.employeeId },
+      });
+    }
     return { success: true, leave };
   } catch (error: any) {
     console.error('Error in requestLeave:', error);
@@ -859,6 +1224,12 @@ export async function updateLeaveStatus(leaveId: string, status: string) {
     const updated = await db.leave.update({
       where: { id: leaveId },
       data: { status }
+    });
+    void notifyPush({
+      title: 'Leave update',
+      body: `Your leave was ${status}`,
+      employeeId: updated.employeeId,
+      data: { type: 'leave', leaveId, status },
     });
     return { success: true, leave: updated };
   } catch (error: any) {
@@ -903,34 +1274,10 @@ function getISTDateAndTime() {
 
 export async function runAutoCheckOut() {
   try {
-    const { todayStr } = getISTDateAndTime();
-    const now = new Date();
-    
-    // Get time in Asia/Kolkata in HH:MM format (24-hour clock)
-    const istTimeStr = now.toLocaleTimeString("en-US", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false });
-    const [istHour, istMinute] = istTimeStr.split(':').map(Number);
-    const isPastSixThirtyPM = (istHour > 18) || (istHour === 18 && istMinute >= 30);
-
-    const activeLogs = await db.attendance.findMany({
-      where: {
-        OR: [
-          { checkOut: null },
-          { status: "Checked In" }
-        ]
-      }
-    });
-
-    for (const log of activeLogs) {
-      if (log.date < todayStr || (log.date === todayStr && isPastSixThirtyPM)) {
-        await db.attendance.update({
-          where: { id: log.id },
-          data: {
-            checkOut: "06:30 PM",
-            status: "Present"
-          }
-        });
-        console.log(`Auto checked out log ID: ${log.id} for employee: ${log.employeeName} on ${log.date}`);
-      }
+    // Closes shifts past 06:30 / 09:30 PM IST and sends FCM (reminder handled by cron).
+    const result = await processAttendanceCheckoutJobs({ notify: true });
+    if (result.autoCheckedOut || result.reminded) {
+      console.log('[runAutoCheckOut]', result);
     }
   } catch (error) {
     console.error('Error in runAutoCheckOut:', error);
@@ -988,7 +1335,7 @@ export async function clockIn(employeeId: string, employeeName: string) {
   }
 }
 
-export async function clockOut(employeeId: string) {
+export async function clockOut(employeeId: string, reason?: string) {
   try {
     const { todayStr, timeStr } = getISTDateAndTime();
 
@@ -1011,10 +1358,77 @@ export async function clockOut(employeeId: string) {
         status: 'Present'
       }
     });
-    return { success: true, log: updated };
+    const r = String(reason || '').trim();
+    const action =
+      r === 'going_home'
+        ? 'going-home'
+        : r === 'outside_geofence_timeout' || r === 'outside_geofence'
+          ? 'auto-check-out'
+          : 'check-out';
+    try {
+      const { emitAttendanceUpdate } = await import('@/lib/realtime-emit');
+      void emitAttendanceUpdate(employeeId, updated, action);
+    } catch (_) {}
+    return { success: true, log: updated, reason: r || 'manual' };
   } catch (error: any) {
     console.error('Error in clockOut:', error);
     return { success: false, error: error.message || 'Failed to clock out' };
+  }
+}
+
+/** Employee chose “Office work” — stay checked in outside office. */
+export async function keepCheckedIn(employeeId: string, reason = 'office_work') {
+  try {
+    const { todayStr } = getISTDateAndTime();
+    const activeLog = await db.attendance.findFirst({
+      where: { employeeId, date: todayStr, checkOut: null },
+    });
+    if (!activeLog) {
+      return { success: false, error: 'No open shift to keep' };
+    }
+    try {
+      const { emitAttendanceUpdate } = await import('@/lib/realtime-emit');
+      void emitAttendanceUpdate(
+        employeeId,
+        activeLog,
+        reason === 'office_work' ? 'office-work' : 'keep-checked-in',
+      );
+    } catch (_) {}
+    return { success: true, log: activeLog, message: 'Still checked in — office work' };
+  } catch (error: any) {
+    console.error('Error in keepCheckedIn:', error);
+    return { success: false, error: error.message || 'Failed' };
+  }
+}
+
+/** Female going home from website — start live trip (optional lat/lng). */
+export async function startGoingHomeTrip(employeeId: string, lat?: number, lng?: number) {
+  try {
+    const emp = await db.employee.findUnique({ where: { id: employeeId } });
+    if (!emp) return { success: false, error: 'Employee not found' };
+    if (String(emp.gender || '').toUpperCase() !== 'FEMALE') {
+      return { success: false, error: 'Home tracking is for female employees' };
+    }
+    await db.safetyTrip.updateMany({
+      where: { employeeId, status: 'IN_TRANSIT' },
+      data: { status: 'CANCELLED', endedAt: new Date() },
+    });
+    const trip = await db.safetyTrip.create({
+      data: {
+        employeeId,
+        status: 'IN_TRANSIT',
+        lat: lat != null && Number.isFinite(lat) ? lat : null,
+        lng: lng != null && Number.isFinite(lng) ? lng : null,
+      },
+    });
+    try {
+      const { emitSafetyUpdate } = await import('@/lib/realtime-emit');
+      void emitSafetyUpdate('trip_started', { employeeId, trip });
+    } catch (_) {}
+    return { success: true, trip };
+  } catch (error: any) {
+    console.error('Error in startGoingHomeTrip:', error);
+    return { success: false, error: error.message || 'Failed to start trip' };
   }
 }
 
@@ -1041,12 +1455,80 @@ export async function getMessages(channel: string, requestingUserId: string, req
 
     const messages = await db.message.findMany({
       where: { channel },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { createdAt: 'asc' },
+      include: { reactions: true },
     });
     return { success: true, messages };
   } catch (error: any) {
     console.error('Error fetching messages:', error);
     return { success: false, error: 'Failed to fetch messages' };
+  }
+}
+
+const EDIT_WINDOW_MS = 10 * 60 * 1000;
+const QUICK_EMOJIS = new Set(['👍', '❤️', '😂', '😮', '😢', '🙏']);
+
+export async function editMessage(
+  messageId: string,
+  senderId: string,
+  content: string
+) {
+  try {
+    const trimmed = content.trim();
+    if (!trimmed) return { success: false, error: 'Message content cannot be empty' };
+
+    const existing = await db.message.findUnique({ where: { id: messageId } });
+    if (!existing) return { success: false, error: 'Message not found' };
+    if (existing.senderId !== senderId) return { success: false, error: 'You can only edit your own messages' };
+
+    const age = Date.now() - new Date(existing.createdAt).getTime();
+    if (age > EDIT_WINDOW_MS) {
+      return { success: false, error: 'Edit window expired (10 minutes)' };
+    }
+
+    const message = await db.message.update({
+      where: { id: messageId },
+      data: { content: trimmed, editedAt: new Date() },
+      include: { reactions: true },
+    });
+    return { success: true, message };
+  } catch (error: any) {
+    console.error('Error editing message:', error);
+    return { success: false, error: error.message || 'Failed to edit message' };
+  }
+}
+
+export async function toggleMessageReaction(
+  messageId: string,
+  userId: string,
+  userName: string,
+  emoji: string
+) {
+  try {
+    if (!QUICK_EMOJIS.has(emoji)) {
+      return { success: false, error: 'Unsupported emoji' };
+    }
+    const existing = await db.message.findUnique({ where: { id: messageId } });
+    if (!existing) return { success: false, error: 'Message not found' };
+
+    const prior = await db.messageReaction.findUnique({
+      where: {
+        messageId_userId_emoji: { messageId, userId, emoji },
+      },
+    });
+
+    if (prior) {
+      await db.messageReaction.delete({ where: { id: prior.id } });
+      return { success: true, removed: true, emoji };
+    }
+
+    const reaction = await db.messageReaction.create({
+      data: { messageId, userId, userName, emoji },
+    });
+    return { success: true, removed: false, reaction };
+  } catch (error: any) {
+    console.error('Error toggling reaction:', error);
+    return { success: false, error: error.message || 'Failed to react' };
   }
 }
 
@@ -1083,6 +1565,15 @@ export async function postMessage(channel: string, senderId: string, senderName:
         content: content.trim()
       }
     });
+
+    // FCM: DM → peer; public/wing → members (exclude sender)
+    void notifyMessagePush({
+      channel,
+      senderId,
+      senderName,
+      content: content.trim(),
+    }).catch((e) => console.error('[postMessage] push failed', e));
+
     return { success: true, message };
   } catch (error: any) {
     console.error('Error posting message:', error);
@@ -1252,12 +1743,13 @@ export async function createEvent(data: {
   imageUrl?: string;
 }) {
   try {
+    const reps = (data.representatives || []).filter((r) => r?.id);
     const event = await db.event.create({
       data: {
         title: data.title,
         description: data.description,
         organisingCollege: data.organisingCollege,
-        representatives: JSON.stringify(data.representatives),
+        representatives: JSON.stringify(reps),
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
         startTime: data.startTime,
@@ -1266,6 +1758,15 @@ export async function createEvent(data: {
         imageUrl: data.imageUrl || null,
       }
     });
+    const ids = representativeIds(reps);
+    if (ids.length) {
+      void notifyPush({
+        title: 'You are an event representative',
+        body: `${data.title} — you were added as a representative.`,
+        employeeIds: ids,
+        data: { type: 'event', eventId: event.id, role: 'representative' },
+      });
+    }
     return { success: true, event };
   } catch (error: any) {
     console.error('Error creating event:', error);
@@ -1285,11 +1786,31 @@ export async function getEvents() {
   }
 }
 
-export async function getEventById(id: string) {
+/** Employee view: only events where they are a listed representative. */
+export async function getEventsForEmployee(employeeId: string) {
+  try {
+    const id = String(employeeId || '').trim();
+    if (!id) return [];
+    const events = await db.event.findMany({
+      where: { allowed: true },
+      orderBy: { startDate: 'asc' },
+    });
+    return events.filter((e) => eventHasRepresentative(e.representatives, id));
+  } catch (error) {
+    console.error('Error fetching employee events:', error);
+    return [];
+  }
+}
+
+export async function getEventById(id: string, employeeId?: string) {
   try {
     const event = await db.event.findUnique({
       where: { id }
     });
+    if (!event) return null;
+    if (employeeId && !eventHasRepresentative(event.representatives, employeeId)) {
+      return null;
+    }
     return event;
   } catch (error) {
     console.error('Error fetching event by id:', error);
@@ -1319,6 +1840,15 @@ export async function createWorkSubmission(data: {
         status: 'Submitted',
       }
     });
+    const adminIds = await resolveAdminEmployeeIds();
+    if (adminIds.length) {
+      void notifyPush({
+        title: 'Work submission',
+        body: `${data.employeeName}: ${data.title}`,
+        employeeIds: adminIds,
+        data: { type: 'submission', submissionId: submission.id, employeeId: data.employeeId },
+      });
+    }
     return { success: true, submission };
   } catch (error: any) {
     console.error('Error creating work submission:', error);
@@ -1356,6 +1886,12 @@ export async function updateSubmissionStatus(submissionId: string, status: strin
     const updated = await db.workSubmission.update({
       where: { id: submissionId },
       data: { status, adminNote: adminNote || null }
+    });
+    void notifyPush({
+      title: 'Submission update',
+      body: `Your work submission was marked ${status}`,
+      employeeId: updated.employeeId,
+      data: { type: 'submission_status', submissionId, status },
     });
     return { success: true, submission: updated };
   } catch (error: any) {
@@ -1736,8 +2272,13 @@ export async function updateEmployee(id: string, data: {
   wingName: string;
   wingLeadName: string;
   role?: string;
+  gender?: string;
 }) {
   try {
+    const genderRaw = String(data.gender || 'UNSPECIFIED').trim().toUpperCase();
+    const gender =
+      genderRaw === 'MALE' || genderRaw === 'FEMALE' ? genderRaw : 'UNSPECIFIED';
+
     const updated = await db.employee.update({
       where: { id },
       data: {
@@ -1749,6 +2290,7 @@ export async function updateEmployee(id: string, data: {
         wingName: data.wingName,
         wingLeadName: data.wingLeadName,
         role: data.role || "Employee",
+        gender,
       }
     });
     return { success: true, employee: updated };
@@ -1919,13 +2461,15 @@ export async function updateEvent(id: string, data: {
   imageUrl?: string;
 }) {
   try {
+    const prior = await db.event.findUnique({ where: { id } });
+    const reps = (data.representatives || []).filter((r) => r?.id);
     const updated = await db.event.update({
       where: { id },
       data: {
         title: data.title,
         description: data.description,
         organisingCollege: data.organisingCollege,
-        representatives: JSON.stringify(data.representatives) as any,
+        representatives: JSON.stringify(reps) as any,
         startDate: new Date(data.startDate),
         endDate: new Date(data.endDate),
         startTime: data.startTime,
@@ -1934,6 +2478,16 @@ export async function updateEvent(id: string, data: {
         imageUrl: data.imageUrl || null,
       }
     });
+    const prevIds = new Set(representativeIds(prior?.representatives));
+    const newlyAdded = representativeIds(reps).filter((rid) => !prevIds.has(rid));
+    if (newlyAdded.length) {
+      void notifyPush({
+        title: 'You are an event representative',
+        body: `${data.title} — you were added as a representative.`,
+        employeeIds: newlyAdded,
+        data: { type: 'event', eventId: id, role: 'representative' },
+      });
+    }
     return { success: true, event: updated };
   } catch (error: any) {
     console.error('Error updating event:', error);

@@ -22,9 +22,11 @@ import {
 	getEmployeeLeaves,
 	clockIn,
 	clockOut,
+	keepCheckedIn,
+	startGoingHomeTrip,
 	getEmployeeAttendance,
 	getCurrentAttendanceStatus,
-	getEvents,
+	getEventsForEmployee,
 	createWorkSubmission,
 	getEmployeeWorkSubmissions,
 	getLeads,
@@ -35,16 +37,18 @@ import {
 	updateHrCompany,
 } from '@/app/admin/actions';
 import { MessagesView } from './messages-view';
-import { AnimatedThemeTogglerNextThemesDemo } from './animated-theme-toggler-next-themes-demo';
+import { EmployeeSafetyPanel } from './safety-panel';
+import { ProfilePhotoEditor } from './profile-photo';
 
-type EmpTabType = 'overview' | 'tasks' | 'attendance' | 'leaves' | 'messages' | 'events' | 'work_submission' | 'leads' | 'hr_companies' | 'profile';
+type EmpTabType = 'overview' | 'tasks' | 'attendance' | 'leaves' | 'messages' | 'events' | 'work_submission' | 'leads' | 'hr_companies' | 'profile' | 'id_card' | 'safety';
 
 interface EmployeeDashboardProps {
 	employee: any;
 	onLogout: () => void;
+	onEmployeeUpdate?: (next: any) => void;
 }
 
-export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps) {
+export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate }: EmployeeDashboardProps) {
 	const [activeTab, setActiveTab] = useState<EmpTabType>('overview');
 	const [empTasks, setEmpTasks] = useState<any[]>([]);
 	const [isTasksLoading, setIsTasksLoading] = useState(false);
@@ -62,6 +66,8 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 	const [leaveMsg, setLeaveMsg] = useState<string | null>(null);
 	const [geofenceError, setGeofenceError] = useState<string | null>(null);
 	const [bypassGeofence, setBypassGeofence] = useState(false);
+	const [leaveChoiceOpen, setLeaveChoiceOpen] = useState(false);
+	const [leaveChoiceBusy, setLeaveChoiceBusy] = useState(false);
 
 	// Events state
 	const [eventsList, setEventsList] = useState<any[]>([]);
@@ -70,14 +76,39 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 	const loadEvents = async () => {
 		setEventsLoading(true);
 		try {
-			const data = await getEvents();
-			setEventsList(data.filter((e: any) => e.allowed !== false));
+			const data = await getEventsForEmployee(employee.id);
+			setEventsList(data);
 		} catch (e) {
 			console.error('Failed to load events:', e);
 		} finally {
 			setEventsLoading(false);
 		}
 	};
+
+	// Live attendance via Socket.IO (Render) when JWT is in session
+	useEffect(() => {
+		const token =
+			(typeof window !== 'undefined' &&
+				(localStorage.getItem('wrkspace_employee_token') ||
+					(JSON.parse(localStorage.getItem('wrkspace_employee_session') || '{}') as any)?.token)) ||
+			'';
+		if (!token || !employee?.id) return;
+		let stop: (() => void) | undefined;
+		(async () => {
+			const { connectRealtime } = await import('@/lib/realtime-client');
+			stop = connectRealtime({
+				token,
+				onAttendance: (p) => {
+					if (p.employeeId === employee.id) {
+						loadEmployeeAttendanceStatus(employee.id);
+						loadEmployeeAttendance(employee.id);
+					}
+				},
+			});
+		})();
+		return () => stop?.();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [employee?.id]);
 
 	// Work Submission state
 	const [mySubmissions, setMySubmissions] = useState<any[]>([]);
@@ -413,57 +444,65 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 		);
 	};
 
-	const handleCheckOut = async () => {
+	const handleCheckOut = () => {
 		if (!employee) return;
 		setGeofenceError(null);
+		setLeaveChoiceOpen(true);
+	};
 
-		if (bypassGeofence) {
-			try {
-				const res = await clockOut(employee.id);
+	const applyLeaveChoice = async (mode: 'office_work' | 'going_home') => {
+		if (!employee || leaveChoiceBusy) return;
+		setLeaveChoiceBusy(true);
+		const female = String(employee?.gender || '').toUpperCase() === 'FEMALE';
+		try {
+			if (mode === 'office_work') {
+				const res = await keepCheckedIn(employee.id, 'office_work');
 				if (res.success) {
-					setAttendanceStatus('checked_out');
+					setLeaveChoiceOpen(false);
+					setGeofenceError(null);
 					loadEmployeeAttendance(employee.id);
 				} else {
-					setGeofenceError(res.error || 'Failed to clock out');
+					setGeofenceError(res.error || 'Failed to keep checked in');
 				}
-			} catch (error) {
-				console.error("Failed to clock out:", error);
-				setGeofenceError("A server error occurred during Clock Out.");
+				return;
 			}
-			return;
-		}
 
-		if (!navigator.geolocation) {
-			setGeofenceError("Geolocation is not supported by your browser. You can select the 'Work Remotely' option if working offsite.");
-			return;
-		}
-
-		navigator.geolocation.getCurrentPosition(
-			async (position) => {
-				const { latitude, longitude } = position.coords;
-				const distance = calculateDistance(latitude, longitude, OFFICE_LAT, OFFICE_LON);
-				if (distance > ALLOWED_RADIUS_METERS) {
-					setGeofenceError(`Access Denied: You are outside the corporate geofence perimeter of STUDENT FORGE Hyderabad Office. You are currently ~${Math.round(distance)}m away. If you are working remotely, please check the "Work Remotely / Bypass Geofence" option.`);
+			const finishGoingHome = async (lat?: number, lng?: number) => {
+				const res = await clockOut(employee.id, 'going_home');
+				if (!res.success) {
+					setGeofenceError(res.error || 'Failed to clock out');
 					return;
 				}
-
-				try {
-					const res = await clockOut(employee.id);
-					if (res.success) {
-						setAttendanceStatus('checked_out');
-						loadEmployeeAttendance(employee.id);
-					} else {
-						setGeofenceError(res.error || 'Failed to clock out');
-					}
-				} catch (error) {
-					console.error("Failed to clock out:", error);
-					setGeofenceError("A server error occurred during Clock Out.");
+				setAttendanceStatus('checked_out');
+				setLeaveChoiceOpen(false);
+				loadEmployeeAttendance(employee.id);
+				if (female) {
+					await startGoingHomeTrip(employee.id, lat, lng);
 				}
-			},
-			(error) => {
-				setGeofenceError("Location Access Required: Please enable location permissions in your browser, or select the 'Work Remotely / Bypass Geofence' option to check out.");
+			};
+
+			if (bypassGeofence || !navigator.geolocation) {
+				await finishGoingHome();
+				return;
 			}
-		);
+			await new Promise<void>((resolve) => {
+				navigator.geolocation.getCurrentPosition(
+					async (position) => {
+						await finishGoingHome(position.coords.latitude, position.coords.longitude);
+						resolve();
+					},
+					async () => {
+						await finishGoingHome();
+						resolve();
+					},
+				);
+			});
+		} catch (error) {
+			console.error('leave choice failed:', error);
+			setGeofenceError('A server error occurred.');
+		} finally {
+			setLeaveChoiceBusy(false);
+		}
 	};
 
 	const handleRequestLeave = async (e: React.FormEvent) => {
@@ -499,26 +538,40 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 	};
 
 	return (
-		<main className={cn(
-			"bg-zinc-950 text-foreground relative flex flex-col font-sans",
+			<main className={cn(
+			"employee-portal bg-[#e8edf5] text-slate-900 relative flex flex-col font-sans",
 			activeTab === 'messages' ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto"
 		)}>
-			{/* Premium background radial glow */}
-			<div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.03),transparent_70%)] z-0 pointer-events-none" />
+			{/* Soft dim wash — less glare than pure white */}
+			<div className="absolute inset-0 z-0 pointer-events-none" />
 
 			{/* Full Width Top Navbar */}
-			<header className="w-full border-b border-zinc-200 dark:border-zinc-900 bg-zinc-950 sticky top-0 z-50 shadow-md shadow-zinc-200/50 dark:shadow-black/40">
+			<header className="w-full border-b border-slate-400 bg-slate-50 sticky top-0 z-50 shadow-sm">
 				<div className="w-full px-6 md:px-10 h-20 flex items-center justify-between">
-					<div className="flex items-center gap-4">
-						<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-8 w-auto object-contain" />
-						<div className="w-px h-7 bg-zinc-800" />
-						<span className="text-xs font-semibold uppercase tracking-widest text-zinc-400 font-mono">Employee</span>
+					<div className="flex items-center gap-3">
+						<img
+							src="/branding/wrkspace-logo.png?v=20260717b"
+							alt="wrkspace"
+							className="emp-logo-mark"
+						/>
+						<div className="w-px h-7 bg-slate-400" />
+						<span className="text-xs font-bold uppercase tracking-widest text-slate-800 font-mono">Employee</span>
 					</div>
 					<div className="flex items-center gap-3">
+						<ProfilePhotoEditor
+							employeeId={employee.id}
+							photoUrl={employee.photoUrl}
+							initials={
+								`${(employee.firstName?.[0] || '').toUpperCase()}${(employee.lastName?.[0] || '').toUpperCase()}` || 'U'
+							}
+							size="md"
+							className="!size-10 !text-sm border-slate-400 shadow-sm"
+							onUpdated={(photoUrl) => onEmployeeUpdate?.({ ...employee, photoUrl })}
+						/>
 						{employee.role === 'Team Lead' && (
 							<Button
 								variant="outline"
-								className="border-indigo-800 bg-indigo-950/40 text-indigo-300 hover:bg-indigo-600 hover:text-white hover:border-indigo-500 cursor-pointer rounded-none transition-all duration-200 text-xs py-2 px-3 h-9 font-mono font-medium flex items-center gap-2"
+								className="border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-500 cursor-pointer rounded-none transition-all duration-200 text-xs py-2 px-3 h-9 font-mono font-medium flex items-center gap-2"
 								onClick={() => {
 									localStorage.setItem('wrkspace_admin_session', JSON.stringify({ email: employee.email }));
 									window.location.href = '/admin';
@@ -528,13 +581,12 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 								switch to lead portal
 							</Button>
 						)}
-						<AnimatedThemeTogglerNextThemesDemo />
 						<Button 
 							variant="outline" 
-							className="border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700 cursor-pointer rounded-none transition-all duration-200 text-xs py-2.5 px-4 h-auto font-medium"
+							className="border-slate-600 bg-white text-slate-900 hover:bg-slate-200 hover:text-black hover:border-slate-800 cursor-pointer rounded-none transition-all duration-200 text-sm py-2.5 px-4 h-auto font-bold"
 							onClick={onLogout}
 						>
-							<LogOutIcon className="size-3.5 me-2 text-red-400" />
+							<LogOutIcon className="size-4 me-2 text-red-600" />
 							Logout
 						</Button>
 					</div>
@@ -542,8 +594,8 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 			</header>
 
 			{/* Subnavbar */}
-			<div className="w-full border-b-2 border-[var(--subnav-border-color)] bg-[var(--subnav-bg-fallback)] z-40 sticky top-20 shadow-lg shadow-brand-950/20 dark:shadow-brand-950/60" style={{backgroundImage: 'var(--subnav-bg)'}}>
-				<div className="w-full px-6 md:px-10 flex gap-6 text-xs md:text-sm font-medium tracking-wide overflow-x-auto">
+			<div className="w-full border-b-2 border-[var(--subnav-border-color)] bg-[var(--subnav-bg-fallback)] z-40 sticky top-20 shadow-sm shadow-zinc-200/60" style={{backgroundImage: 'var(--subnav-bg)'}}>
+				<div className="w-full px-6 md:px-10 flex gap-5 md:gap-6 text-sm font-semibold tracking-wide overflow-x-auto">
 					<button 
 						onClick={() => setActiveTab('overview')}
 						className={cn(
@@ -552,6 +604,16 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 						)}
 					>
 						Overview
+					</button>
+					{/* All employees: open SOS inbox. Girl Safety trigger/home = female only (inside panel). */}
+					<button
+						onClick={() => setActiveTab('safety')}
+						className={cn(
+							"py-3.5 border-b-2 transition-all cursor-pointer",
+							activeTab === 'safety' ? 'border-[var(--subnav-border-active)] text-[var(--subnav-text-active)] font-semibold' : 'border-transparent text-[var(--subnav-text-inactive)] hover:text-[var(--subnav-text-hover)]'
+						)}
+					>
+						{String(employee?.gender || '').toUpperCase() === 'FEMALE' ? 'Girl Safety' : 'SOS alerts'}
 					</button>
 					<button 
 						onClick={() => {
@@ -659,6 +721,15 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 						)}
 					>
 						Profile
+					</button>
+					<button
+						onClick={() => setActiveTab('id_card')}
+						className={cn(
+							"py-3.5 border-b-2 transition-all cursor-pointer whitespace-nowrap",
+							activeTab === 'id_card' ? 'border-[var(--subnav-border-active)] text-[var(--subnav-text-active)] font-semibold' : 'border-transparent text-[var(--subnav-text-inactive)] hover:text-[var(--subnav-text-hover)]'
+						)}
+					>
+						ID card
 					</button>
 				</div>
 			</div>
@@ -885,6 +956,41 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 				{/* TAB: ATTENDANCE */}
 				{activeTab === 'attendance' && (
 					<div className="space-y-6">
+						{leaveChoiceOpen && (
+							<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+								<div className="w-full max-w-md border border-zinc-700 bg-zinc-950 p-5 space-y-4">
+									<h3 className="text-sm font-semibold text-white">Leaving office?</h3>
+									<p className="text-xs text-zinc-400 leading-relaxed">
+										{String(employee?.gender || '').toUpperCase() === 'FEMALE'
+											? 'Office work keeps you checked in. Going home checks you out and starts home tracking (use the mobile app for live GPS until you arrive).'
+											: 'Office work keeps you checked in. Going home checks you out.'}
+									</p>
+									<div className="flex flex-col sm:flex-row gap-2">
+										<Button
+											disabled={leaveChoiceBusy}
+											onClick={() => applyLeaveChoice('office_work')}
+											className="flex-1 rounded-none bg-zinc-800 hover:bg-zinc-700 text-white text-xs h-10"
+										>
+											Office work
+										</Button>
+										<Button
+											disabled={leaveChoiceBusy}
+											onClick={() => applyLeaveChoice('going_home')}
+											className="flex-1 rounded-none bg-brand-600 hover:bg-brand-500 text-white text-xs h-10"
+										>
+											Going home
+										</Button>
+										<Button
+											disabled={leaveChoiceBusy}
+											onClick={() => setLeaveChoiceOpen(false)}
+											className="rounded-none bg-transparent border border-zinc-700 text-zinc-300 text-xs h-10"
+										>
+											Cancel
+										</Button>
+									</div>
+								</div>
+							</div>
+						)}
 						{geofenceError && (
 							<div className="bg-red-600/10 border border-red-600/25 p-4 rounded-none text-xs text-red-400 font-mono flex items-start gap-2.5 transition-all">
 								<span className="font-bold uppercase bg-red-600 text-white px-1.5 py-0.5 text-[9px] tracking-wider shrink-0">Geofence Alert</span>
@@ -1125,7 +1231,7 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 								<CalendarIcon className="size-5 text-brand-400" />
 								Company Events
 							</h2>
-							<p className="text-zinc-400 text-sm mt-0.5">Upcoming and ongoing events you may be participating in</p>
+							<p className="text-zinc-400 text-sm mt-0.5">Events where you are listed as a representative</p>
 						</div>
 
 						{eventsLoading ? (
@@ -1135,8 +1241,8 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 						) : eventsList.length === 0 ? (
 							<div className="text-center py-16 text-zinc-600 border border-zinc-900">
 								<CalendarIcon className="size-10 mx-auto mb-3 opacity-40" />
-								<p className="text-sm font-medium">No events scheduled yet</p>
-								<p className="text-xs mt-1">Check back later for upcoming company events</p>
+								<p className="text-sm font-medium">No events assigned to you</p>
+								<p className="text-xs mt-1">You only see events where admin added you as a representative</p>
 							</div>
 						) : (
 							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1188,8 +1294,8 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 												<div className="pt-3 border-t border-zinc-900 text-[11px] text-zinc-400 flex items-center justify-between">
 													<span className="font-mono">{fmt(startD)}</span>
 													<button
-														onClick={() => window.open(`/events/${event.id}`, '_blank')}
-														className="text-brand-400 hover:text-brand-300 font-bold text-xs uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
+														onClick={() => { window.location.href = `/events/${event.id}`; }}
+														className="text-brand-600 hover:text-brand-800 font-bold text-xs uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
 													>
 														View Details →
 													</button>
@@ -1864,6 +1970,39 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 				})()}
 
 				{/* TAB: PROFILE */}
+				{activeTab === 'safety' && (
+					<EmployeeSafetyPanel employee={employee} onEmployeeUpdate={onEmployeeUpdate} />
+				)}
+
+				{activeTab === 'id_card' && (
+					<div className="space-y-6">
+						<div>
+							<h2 className="text-xl font-bold text-white flex items-center gap-2">
+								<BriefcaseIcon className="size-5 text-brand-400" />
+								Employee ID card
+							</h2>
+							<p className="text-zinc-400 text-sm mt-0.5">Your official ID card uploaded by admin</p>
+						</div>
+						<div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none space-y-4 max-w-2xl">
+							<p className="text-sm text-zinc-300 font-semibold">
+								{employee.firstName} {employee.lastName} · ID {employee.id}
+							</p>
+							{employee.idCardUrl ? (
+								// eslint-disable-next-line @next/next/no-img-element
+								<img
+									src={employee.idCardUrl}
+									alt="Employee ID card"
+									className="w-full border border-zinc-700 bg-white object-contain max-h-[520px]"
+								/>
+							) : (
+								<div className="border border-dashed border-zinc-700 p-10 text-center text-zinc-500 text-sm">
+									No ID card uploaded yet. Ask admin to upload it from Employees → Edit employee.
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+
 				{activeTab === 'profile' && (
 					<div className="space-y-6">
 						{/* Header */}
@@ -1878,8 +2017,17 @@ export function EmployeeDashboard({ employee, onLogout }: EmployeeDashboardProps
 						{/* Main Info Card */}
 						<div className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-none space-y-8">
 							<div className="flex flex-col sm:flex-row items-center gap-6 pb-8 border-b border-zinc-800">
-								<div className="size-20 bg-brand-900/60 border border-brand-700/50 flex items-center justify-center text-white text-3xl font-black rounded-none tracking-wider shadow-lg shadow-brand-950/40">
-									{(employee.firstName?.[0] || '').toUpperCase()}{(employee.lastName?.[0] || '').toUpperCase()}
+								<div className="flex flex-col items-center gap-2">
+									<ProfilePhotoEditor
+										employeeId={employee.id}
+										photoUrl={employee.photoUrl}
+										initials={`${(employee.firstName?.[0] || '').toUpperCase()}${(employee.lastName?.[0] || '').toUpperCase()}` || 'U'}
+										size="lg"
+										onUpdated={(photoUrl) => onEmployeeUpdate?.({ ...employee, photoUrl })}
+									/>
+									<p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider">
+										{employee.photoUrl ? 'Tap to view / change' : 'Tap pencil to upload'}
+									</p>
 								</div>
 								<div className="text-center sm:text-left space-y-1">
 									<h3 className="text-xl font-bold text-white leading-tight">
