@@ -97,7 +97,13 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	const forcedTab = panel ? PANEL_TAB[panel] || 'profile' : null;
 
 	return (
-		<div className="mobile-flutter-shell fixed inset-0 z-40 flex flex-col bg-[#F0F3FF] text-[#0F172A] antialiased">
+		<div
+			className="mobile-flutter-shell fixed inset-0 z-40 flex flex-col bg-[#F0F3FF] text-[#0F172A] antialiased"
+			style={{
+				fontFamily:
+					'var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif',
+			}}
+		>
 			{installHint ? (
 				<div className="z-50 flex items-start gap-2 bg-[#0047FF] px-3 py-2 text-[12px] font-medium text-white">
 					<p className="min-w-0 flex-1">
