@@ -48,9 +48,11 @@ interface EmployeeDashboardProps {
 	onEmployeeUpdate?: (next: any) => void;
 	/** When set, show only this tab (Flutter More → feature panel). */
 	mobilePanelTab?: EmpTabType;
+	/** More → Attendance logs: hide clock-in UI, show logs only. */
+	mobileLogsOnly?: boolean;
 }
 
-export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobilePanelTab }: EmployeeDashboardProps) {
+export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobilePanelTab, mobileLogsOnly }: EmployeeDashboardProps) {
 	const [activeTab, setActiveTab] = useState<EmpTabType>(mobilePanelTab || 'overview');
 	const [empTasks, setEmpTasks] = useState<any[]>([]);
 	const [isTasksLoading, setIsTasksLoading] = useState(false);
@@ -968,7 +970,7 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 				{/* TAB: ATTENDANCE */}
 				{activeTab === 'attendance' && (
 					<div className="space-y-6">
-						{leaveChoiceOpen && (
+						{leaveChoiceOpen && !(mobilePanelTab && mobileLogsOnly) && (
 							<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
 								<div className="w-full max-w-md border border-zinc-700 bg-zinc-950 p-5 space-y-4">
 									<h3 className="text-sm font-semibold text-white">Leaving office?</h3>
@@ -1003,7 +1005,7 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 								</div>
 							</div>
 						)}
-						{geofenceError && (
+						{geofenceError && !(mobilePanelTab && mobileLogsOnly) && (
 							<div className="bg-red-600/10 border border-red-600/25 p-4 rounded-none text-xs text-red-400 font-mono flex items-start gap-2.5 transition-all">
 								<span className="font-bold uppercase bg-red-600 text-white px-1.5 py-0.5 text-[9px] tracking-wider shrink-0">Geofence Alert</span>
 								<span>{geofenceError}</span>
@@ -1011,6 +1013,7 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 						)}
 
 						{/* Top Timer & Action Container */}
+						{!(mobilePanelTab && mobileLogsOnly) && (
 						<div className="bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-none">
 							<div className="flex items-center gap-4 text-start">
 								<div className="bg-brand-950/40 border border-brand-900/50 p-3 flex items-center justify-center">
@@ -1058,11 +1061,12 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 								</label>
 							</div>
 						</div>
+						)}
 
 						{/* Attendance Logs Table */}
 						<div className="bg-zinc-900/30 border border-zinc-800 p-6 space-y-4 rounded-none">
 							<h3 className="text-sm font-semibold text-white uppercase tracking-wider border-b border-zinc-800 pb-2">
-								Attendance Shift Registry
+								{mobileLogsOnly ? 'Attendance logs' : 'Attendance Shift Registry'}
 							</h3>
 							{attendanceLogs.length === 0 ? (
 								<div className="text-zinc-500 text-xs italic py-6 text-center">

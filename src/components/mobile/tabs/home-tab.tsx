@@ -10,6 +10,7 @@ import {
 	Leaf,
 	LogOut,
 	QrCode,
+	Siren,
 	TrendingUp,
 } from 'lucide-react';
 import { CorpPageHeader } from '../corp-page-header';
@@ -18,6 +19,7 @@ import {
 	clockOut,
 	getCurrentAttendanceStatus,
 	getEventsForEmployee,
+	getOpenSosIncidents,
 	startGoingHomeTrip,
 } from '@/app/admin/actions';
 import { cn } from '@/lib/utils';
@@ -42,6 +44,7 @@ export function MobileHomeTab({
 	const [today, setToday] = useState<any>(null);
 	const [overview, setOverview] = useState<any>(null);
 	const [events, setEvents] = useState<any[]>([]);
+	const [openSos, setOpenSos] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [clockBusy, setClockBusy] = useState(false);
 	const [toast, setToast] = useState<string | null>(null);
@@ -78,6 +81,24 @@ export function MobileHomeTab({
 	useEffect(() => {
 		void refresh();
 	}, [refresh, refreshToken]);
+
+	useEffect(() => {
+		let alive = true;
+		const poll = async () => {
+			try {
+				const rows = await getOpenSosIncidents(Date.now());
+				if (alive) setOpenSos(Array.isArray(rows) ? rows : []);
+			} catch {
+				/* ignore */
+			}
+		};
+		void poll();
+		const t = window.setInterval(poll, 12000);
+		return () => {
+			alive = false;
+			window.clearInterval(t);
+		};
+	}, []);
 
 	const showToast = (msg: string) => {
 		setToast(msg);
@@ -250,6 +271,20 @@ export function MobileHomeTab({
 						)}
 					</div>
 				</section>
+
+				{openSos.length > 0 ? (
+					<button
+						type="button"
+						onClick={() => onOpenPanel?.('safety')}
+						className="mt-4 flex w-full items-center gap-3 rounded-[14px] border border-rose-200 bg-rose-50 px-3.5 py-3.5 text-left"
+					>
+						<Siren className="size-5 shrink-0 text-[#B42318]" />
+						<p className="min-w-0 flex-1 text-sm font-semibold text-[#B42318]">
+							{openSos.length} open SOS alert{openSos.length === 1 ? '' : 's'} — tap for live map
+						</p>
+						<ChevronRight className="size-5 text-rose-400" />
+					</button>
+				) : null}
 
 				{female ? (
 					<section className="mt-4 rounded-[14px] border border-[#E2E8F0] bg-white p-4">

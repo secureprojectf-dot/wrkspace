@@ -31,6 +31,8 @@ import { cn } from '@/lib/utils';
 type Props = {
 	employee: any;
 	onChatOpenChange?: (open: boolean) => void;
+	/** Incremented by shell on system back to leave an open chat. */
+	closeChatSignal?: number;
 };
 
 const ALL_CHANNELS = ['public', 'marketing', 'technical', 'core'] as const;
@@ -100,7 +102,7 @@ function fileToDataUrl(file: File): Promise<string> {
 }
 
 /** Flutter MessagesTab parity: lists + chat with long-press actions & attach. */
-export function MobileMessagesTab({ employee, onChatOpenChange }: Props) {
+export function MobileMessagesTab({ employee, onChatOpenChange, closeChatSignal = 0 }: Props) {
 	const myId = String(employee?.id || '');
 	const myName = employeeDisplayName(employee);
 
@@ -221,6 +223,12 @@ export function MobileMessagesTab({ employee, onChatOpenChange }: Props) {
 		setActionMsg(null);
 		setChatOpen(false);
 	};
+
+	useEffect(() => {
+		if (!closeChatSignal) return;
+		closeChat();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [closeChatSignal]);
 
 	const openChannel = async (c: string) => {
 		if (!unlocked.includes(c)) {

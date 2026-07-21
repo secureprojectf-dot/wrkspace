@@ -79,6 +79,33 @@ export function getPosition(timeoutMs = 20000): Promise<GeolocationPosition> {
 	});
 }
 
+export type LocationPermissionStatus = 'ok' | 'denied' | 'prompt' | 'unsupported';
+
+/** Request / check geolocation for PWA live tracking (Flutter GeofenceService equivalent). */
+export async function ensureLocationPermission(opts?: {
+	forcePrompt?: boolean;
+}): Promise<LocationPermissionStatus> {
+	if (typeof window === 'undefined' || !navigator.geolocation) return 'unsupported';
+	try {
+		const perms = (navigator as Navigator & { permissions?: Permissions }).permissions;
+		if (perms?.query && !opts?.forcePrompt) {
+			const result = await perms.query({ name: 'geolocation' as PermissionName });
+			if (result.state === 'granted') return 'ok';
+			if (result.state === 'denied') return 'denied';
+		}
+	} catch {
+		/* Permissions API optional */
+	}
+	try {
+		await getPosition(15000);
+		return 'ok';
+	} catch (e: any) {
+		const code = e?.code;
+		if (code === 1 || /denied/i.test(String(e?.message || ''))) return 'denied';
+		return 'prompt';
+	}
+}
+
 export function employeeDisplayName(emp: any): string {
 	const n = `${emp?.firstName || ''} ${emp?.lastName || ''}`.trim() || emp?.name || 'Employee';
 	return n;

@@ -22,15 +22,17 @@ type Opts = {
 	employee: any;
 	enabled: boolean;
 	onLeaveOffice?: () => void;
+	onLocationError?: () => void;
 };
 
 /**
  * Foreground tracking while the mobile web app is open (PWA / Safari).
  * Mirrors Flutter leave-office + home heartbeat as closely as browsers allow.
  */
-export function useMobileTracking({ employee, enabled, onLeaveOffice }: Opts) {
+export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocationError }: Opts) {
 	const leavePrompted = useRef(false);
 	const officesRef = useRef<{ lat: number; lng: number; geofenceM?: number }[]>([]);
+	const errorNotified = useRef(false);
 
 	useEffect(() => {
 		if (!enabled || !employee?.id) return;
@@ -38,6 +40,13 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice }: Opts) {
 		let alive = true;
 		let officeTimer: number | undefined;
 		let homeTimer: number | undefined;
+
+		const failLoc = () => {
+			if (!errorNotified.current) {
+				errorNotified.current = true;
+				onLocationError?.();
+			}
+		};
 
 		const loadOffices = async () => {
 			try {
@@ -64,6 +73,7 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice }: Opts) {
 					return;
 				}
 				const pos = await getPosition(12000);
+				errorNotified.current = false;
 				const { latitude: lat, longitude: lng } = pos.coords;
 				await apiPost('/api/attendance/location', { lat, lng }).catch(() => {});
 
@@ -85,7 +95,7 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice }: Opts) {
 					leavePrompted.current = false;
 				}
 			} catch {
-				/* ignore */
+				failLoc();
 			}
 		};
 
@@ -98,12 +108,13 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice }: Opts) {
 					(trips.trips || []).find((t: any) => t.status === 'IN_TRANSIT');
 				if (!open?.id) return;
 				const pos = await getPosition(12000);
+				errorNotified.current = false;
 				await apiPost(`/api/safety/trips/${open.id}/location`, {
 					lat: pos.coords.latitude,
 					lng: pos.coords.longitude,
 				});
 			} catch {
-				/* ignore */
+				failLoc();
 			}
 		};
 
@@ -119,5 +130,5 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice }: Opts) {
 			if (officeTimer) window.clearInterval(officeTimer);
 			if (homeTimer) window.clearInterval(homeTimer);
 		};
-	}, [employee, enabled, onLeaveOffice]);
+	}, [employee, enabled, onLeaveOffice, onLocationError]);
 }

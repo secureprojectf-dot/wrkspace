@@ -331,6 +331,24 @@ body {
   box-shadow: none !important;
 }
 
+/* Light Flutter-like More feature panels (EmployeeDashboard embed) */
+.emp-mobile-panel .employee-portal {
+  background: #f0f3ff !important;
+  min-height: 0 !important;
+}
+.emp-mobile-panel .text-white {
+  color: #0f172a !important;
+}
+.emp-mobile-panel .bg-zinc-950,
+.emp-mobile-panel .bg-zinc-950\/40 {
+  background-color: #f8fafc !important;
+}
+.emp-mobile-panel input,
+.emp-mobile-panel textarea,
+.emp-mobile-panel select {
+  color: #0f172a !important;
+}
+
 #wrkspace-qr-reader video {
   object-fit: cover !important;
   width: 100% !important;
