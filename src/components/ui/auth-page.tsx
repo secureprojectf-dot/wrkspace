@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './button';
 import { useIsMobile } from '@/hooks/use-is-mobile';
-import { purgeBrokenServiceWorkers } from '@/lib/purge-sw';
 
 import {
 	AtSignIcon,
@@ -60,10 +59,6 @@ function EmployeeShell({
 	onEmployeeUpdate: (next: any) => void;
 }) {
 	const isMobile = useIsMobile();
-
-	useEffect(() => {
-		void purgeBrokenServiceWorkers();
-	}, []);
 
 	if (isMobile === null) return <ShellLoading />;
 

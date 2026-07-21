@@ -3,28 +3,61 @@
 import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { CorpBottomNav } from './corp-bottom-nav';
-import { MobileHomeTab } from './tabs/home-tab';
-import { MobileTasksTab } from './tabs/tasks-tab';
-import { MobileMessagesTab } from './tabs/messages-tab';
-import { MobileMoreTab } from './tabs/more-tab';
-import { MobileScannerScreen } from './scanner-screen';
 import {
 	clearOfficeExitPending,
 	markOfficeExitPending,
 	readOfficeExitPending,
 	useMobileTracking,
 } from './use-mobile-tracking';
-import { MobileSafetyHub } from './safety/safety-hub';
-import { MobileEmergencySos } from './safety/emergency-sos';
-import { MobileHomePin } from './safety/home-pin';
-import { MobileTripHistory } from './safety/trip-history';
 import { keepCheckedIn, clockOut, startGoingHomeTrip } from '@/app/admin/actions';
 import { ensureLocationPermission, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
-import { registerWebPush } from '@/lib/web-push';
-import { purgeBrokenServiceWorkers } from '@/lib/purge-sw';
 
 const AUTO_CHECKOUT_MS = 5 * 60 * 1000;
 
+function TabLoading() {
+	return (
+		<div className="flex h-full items-center justify-center">
+			<div className="size-7 animate-spin rounded-full border-2 border-[#0047FF] border-t-transparent" />
+		</div>
+	);
+}
+
+const MobileHomeTab = dynamic(
+	() => import('./tabs/home-tab').then((m) => m.MobileHomeTab),
+	{ ssr: false, loading: () => <TabLoading /> },
+);
+const MobileTasksTab = dynamic(
+	() => import('./tabs/tasks-tab').then((m) => m.MobileTasksTab),
+	{ ssr: false, loading: () => <TabLoading /> },
+);
+const MobileMessagesTab = dynamic(
+	() => import('./tabs/messages-tab').then((m) => m.MobileMessagesTab),
+	{ ssr: false, loading: () => <TabLoading /> },
+);
+const MobileMoreTab = dynamic(
+	() => import('./tabs/more-tab').then((m) => m.MobileMoreTab),
+	{ ssr: false, loading: () => <TabLoading /> },
+);
+const MobileScannerScreen = dynamic(
+	() => import('./scanner-screen').then((m) => m.MobileScannerScreen),
+	{ ssr: false },
+);
+const MobileSafetyHub = dynamic(
+	() => import('./safety/safety-hub').then((m) => m.MobileSafetyHub),
+	{ ssr: false },
+);
+const MobileEmergencySos = dynamic(
+	() => import('./safety/emergency-sos').then((m) => m.MobileEmergencySos),
+	{ ssr: false },
+);
+const MobileHomePin = dynamic(
+	() => import('./safety/home-pin').then((m) => m.MobileHomePin),
+	{ ssr: false },
+);
+const MobileTripHistory = dynamic(
+	() => import('./safety/trip-history').then((m) => m.MobileTripHistory),
+	{ ssr: false },
+);
 const EmployeeDashboard = dynamic(
 	() => import('@/components/ui/employee-dashboard').then((m) => m.EmployeeDashboard),
 	{ ssr: false },
@@ -84,7 +117,6 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	const [closeChatSignal, setCloseChatSignal] = useState(0);
 	const [locStatus, setLocStatus] = useState<'ok' | 'denied' | 'prompt' | 'unsupported'>('prompt');
 	const [locBannerDismissed, setLocBannerDismissed] = useState(false);
-	const pushStarted = useRef(false);
 	const leaveTimerRef = useRef<number | undefined>(undefined);
 	const leaveTickRef = useRef<number | undefined>(undefined);
 	const leaveBusyRef = useRef(false);
@@ -107,7 +139,6 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	useEffect(() => {
 		document.documentElement.classList.remove('dark');
 		document.documentElement.classList.add('light');
-		void purgeBrokenServiceWorkers();
 
 		const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
 		const standalone =
@@ -117,13 +148,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 
 		const tLoc = window.setTimeout(() => {
 			void ensureLocationPermission().then(setLocStatus);
-		}, 2000);
-
-		const tPush = window.setTimeout(() => {
-			if (pushStarted.current) return;
-			pushStarted.current = true;
-			void registerWebPush(employee?.id);
-		}, 8000);
+		}, 2500);
 
 		// Restore pending leave choice after a beat (don't block first paint)
 		const tLeave = window.setTimeout(() => {
@@ -140,11 +165,10 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 			} catch {
 				/* ignore */
 			}
-		}, 500);
+		}, 800);
 
 		return () => {
 			window.clearTimeout(tLoc);
-			window.clearTimeout(tPush);
 			window.clearTimeout(tLeave);
 			clearLeaveTimers();
 		};
@@ -295,34 +319,43 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 			) : null}
 
 			<div className="relative min-h-0 flex-1">
-				<div className={section === 'home' ? 'h-full' : 'hidden'}>
-					<MobileHomeTab
-						employee={employee}
-						refreshToken={refreshToken}
-						onOpenScanner={() => setScannerOpen(true)}
-						onOpenProfile={() => openPanel('profile')}
-						onOpenSafety={() => openPanel('safety')}
-						onOpenPanel={openPanel}
-					/>
-				</div>
-				<div className={section === 'tasks' ? 'h-full' : 'hidden'}>
-					<MobileTasksTab employee={employee} />
-				</div>
-				<div className={section === 'messages' ? 'h-full' : 'hidden'}>
-					<MobileMessagesTab
-						employee={employee}
-						onChatOpenChange={(open) => setMessagesChatOpen(open)}
-						closeChatSignal={closeChatSignal}
-					/>
-				</div>
-				<div className={section === 'more' ? 'h-full' : 'hidden'}>
-					<MobileMoreTab
-						employee={employee}
-						onOpenPanel={openPanel}
-						onLogout={onLogout}
-						onProfile={() => openPanel('profile')}
-					/>
-				</div>
+				{/* Mount only the active tab so Android does not load all chunks at once */}
+				{section === 'home' ? (
+					<div className="h-full">
+						<MobileHomeTab
+							employee={employee}
+							refreshToken={refreshToken}
+							onOpenScanner={() => setScannerOpen(true)}
+							onOpenProfile={() => openPanel('profile')}
+							onOpenSafety={() => openPanel('safety')}
+							onOpenPanel={openPanel}
+						/>
+					</div>
+				) : null}
+				{section === 'tasks' ? (
+					<div className="h-full">
+						<MobileTasksTab employee={employee} />
+					</div>
+				) : null}
+				{section === 'messages' ? (
+					<div className="h-full">
+						<MobileMessagesTab
+							employee={employee}
+							onChatOpenChange={(open) => setMessagesChatOpen(open)}
+							closeChatSignal={closeChatSignal}
+						/>
+					</div>
+				) : null}
+				{section === 'more' ? (
+					<div className="h-full">
+						<MobileMoreTab
+							employee={employee}
+							onOpenPanel={openPanel}
+							onLogout={onLogout}
+							onProfile={() => openPanel('profile')}
+						/>
+					</div>
+				) : null}
 			</div>
 
 			<CorpBottomNav

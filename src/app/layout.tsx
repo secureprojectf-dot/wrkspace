@@ -47,6 +47,7 @@ export const metadata: Metadata = {
 };
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { ChunkReloadGuard } from "@/components/chunk-reload-guard";
 
 export default function RootLayout({
   children,
@@ -60,20 +61,21 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        {/* Unregister SWs once. Never wipe Cache Storage every load — that breaks chunk fetches. */}
         <Script id="purge-sw" strategy="beforeInteractive">{`
           try {
-            if ('serviceWorker' in navigator) {
+            var FLAG = 'wrkspace_sw_purged_v3';
+            if (localStorage.getItem(FLAG) === '1') { /* already done */ }
+            else if ('serviceWorker' in navigator) {
               navigator.serviceWorker.getRegistrations().then(function(regs) {
-                regs.forEach(function(r) { r.unregister(); });
-              });
-            }
-            if (window.caches && caches.keys) {
-              caches.keys().then(function(keys) {
-                keys.forEach(function(k) { caches.delete(k); });
+                return Promise.all(regs.map(function(r) { return r.unregister(); }));
+              }).then(function() {
+                try { localStorage.setItem(FLAG, '1'); } catch (e) {}
               });
             }
           } catch (e) {}
         `}</Script>
+        <ChunkReloadGuard />
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
           {children}
         </ThemeProvider>
