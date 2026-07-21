@@ -57,6 +57,9 @@ export async function GET(req: NextRequest) {
 		const firebaseConfigured = Boolean(
 			process.env.FIREBASE_SERVICE_ACCOUNT_JSON && String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON).trim()
 		);
+		const vapidConfigured = Boolean(
+			process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY && String(process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY).trim()
+		);
 
 		return Response.json({
 			incidents,
@@ -64,6 +67,7 @@ export async function GET(req: NextRequest) {
 			fcm: {
 				tokens,
 				firebaseConfigured,
+				vapidConfigured,
 				ready: tokens > 0 && firebaseConfigured,
 			},
 			at: new Date().toISOString(),

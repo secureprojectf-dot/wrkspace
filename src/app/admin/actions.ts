@@ -606,14 +606,18 @@ export async function getFcmPushStatus() {
     const firebaseConfigured = Boolean(
       process.env.FIREBASE_SERVICE_ACCOUNT_JSON && String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON).trim()
     );
+    const vapidConfigured = Boolean(
+      process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY && String(process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY).trim()
+    );
     return {
       tokens,
       firebaseConfigured,
+      vapidConfigured,
       ready: tokens > 0 && firebaseConfigured,
     };
   } catch (error) {
     console.error('getFcmPushStatus', error);
-    return { tokens: 0, firebaseConfigured: false, ready: false };
+    return { tokens: 0, firebaseConfigured: false, vapidConfigured: false, ready: false };
   }
 }
 

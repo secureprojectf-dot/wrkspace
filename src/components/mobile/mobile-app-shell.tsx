@@ -13,6 +13,7 @@ import {
 import { keepCheckedIn, clockOut, startGoingHomeTrip } from '@/app/admin/actions';
 import { ensureLocationPermission, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
 import { importWithRetry } from '@/lib/import-with-retry';
+import { registerWebPush, subscribeOfficeExitPush } from '@/lib/web-push';
 
 const AUTO_CHECKOUT_MS = 5 * 60 * 1000;
 
@@ -175,6 +176,13 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 			void ensureLocationPermission().then(setLocStatus);
 		}, 2500);
 
+		// FCM after first paint — never block shell mount (Android Chrome stability).
+		const tPush = window.setTimeout(() => {
+			void registerWebPush(employee?.id).then(() => {
+				subscribeOfficeExitPush(openLeaveDialog);
+			});
+		}, 3500);
+
 		// Restore pending leave choice after a beat (don't block first paint)
 		const tLeave = window.setTimeout(() => {
 			try {
@@ -194,6 +202,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 
 		return () => {
 			window.clearTimeout(tLoc);
+			window.clearTimeout(tPush);
 			window.clearTimeout(tLeave);
 			clearLeaveTimers();
 		};

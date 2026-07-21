@@ -10,8 +10,8 @@ type PushPayload = {
 };
 
 /**
- * Prefer sending FCM from Vercel (Neon tokens + Firebase admin).
- * Also try Render internal push when available (legacy / backup).
+ * Send FCM from Vercel (Neon tokens + Firebase admin).
+ * Only fall back to Render when Vercel cannot send (missing Firebase env / hard error).
  */
 export async function notifyPush(payload: PushPayload) {
 	const results: Record<string, unknown> = {};
@@ -21,7 +21,7 @@ export async function notifyPush(payload: PushPayload) {
 		data: payload.data,
 	};
 
-	// 1) Direct from website — works even when Render is stale
+	let vercelOk = false;
 	try {
 		if (payload.all) {
 			results.vercel = await sendFcmToAllActive(body);
@@ -30,13 +30,19 @@ export async function notifyPush(payload: PushPayload) {
 		} else if (payload.employeeId) {
 			results.vercel = await sendFcmToEmployee(payload.employeeId, body);
 		}
+		const v = results.vercel as { sent?: number; skipped?: string } | undefined;
+		if (v && v.skipped !== 'no_firebase_env') {
+			vercelOk = true;
+		}
 		if (results.vercel) console.info('[push] vercel fcm', results.vercel);
 	} catch (e) {
 		console.error('[push] vercel fcm failed', e);
 		results.vercelError = String(e);
 	}
 
-	// 2) Backup: Render internal API (may 404 if not deployed)
+	// Backup only when Vercel path did not run (no service account) or threw.
+	if (vercelOk) return results;
+
 	const base = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || 'https://wrkspace-api.onrender.com').replace(
 		/\/$/,
 		''

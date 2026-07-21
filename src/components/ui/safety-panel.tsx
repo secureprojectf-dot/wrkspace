@@ -195,7 +195,12 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 	const [resolvingId, setResolvingId] = useState<string | null>(null);
 	const [error, setError] = useState('');
 	const [lastAt, setLastAt] = useState<string | null>(null);
-	const [fcm, setFcm] = useState<{ tokens: number; firebaseConfigured: boolean; ready: boolean } | null>(null);
+	const [fcm, setFcm] = useState<{
+		tokens: number;
+		firebaseConfigured: boolean;
+		vapidConfigured?: boolean;
+		ready: boolean;
+	} | null>(null);
 	const [histDate, setHistDate] = useState(todayIST());
 	const [histEmployeeId, setHistEmployeeId] = useState('');
 	const [histTrips, setHistTrips] = useState<any[]>([]);
@@ -327,8 +332,11 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 							}`}
 						>
 							<p className="font-semibold">
-								FCM status: {fcm.tokens} phone token{fcm.tokens === 1 ? '' : 's'} · Firebase send:{' '}
+								FCM status: {fcm.tokens} device token{fcm.tokens === 1 ? '' : 's'} · Firebase send:{' '}
 								{fcm.firebaseConfigured ? 'ON' : 'OFF'}
+								{typeof fcm.vapidConfigured === 'boolean'
+									? ` · Web VAPID: ${fcm.vapidConfigured ? 'ON' : 'OFF'}`
+									: ''}
 							</p>
 							{!fcm.firebaseConfigured ? (
 								<p className="mt-1 opacity-90">
@@ -337,13 +345,20 @@ export function AdminLiveSafetyPanel({ adminEmail }: { adminEmail: string }) {
 									(Firebase → Project settings → Service accounts → Generate key → paste full JSON).
 								</p>
 							) : null}
+							{fcm.vapidConfigured === false ? (
+								<p className="mt-1 opacity-90">
+									Web / PWA push will not register until{' '}
+									<code className="text-[10px]">NEXT_PUBLIC_FIREBASE_VAPID_KEY</code> is set on
+									Vercel (Firebase → Project settings → Cloud Messaging → Web Push certificates).
+								</p>
+							) : null}
 							{fcm.firebaseConfigured && fcm.tokens === 0 ? (
 								<p className="mt-1 opacity-90">
-									No phone tokens yet — every employee must open the latest app, log in, and allow
+									No device tokens yet — employees must open the app or website, log in, and allow
 									Notifications.
 								</p>
 							) : null}
-							{fcm.ready ? <p className="mt-1 opacity-90">SOS alarms can fan out to registered phones.</p> : null}
+							{fcm.ready ? <p className="mt-1 opacity-90">SOS alarms can fan out to registered devices.</p> : null}
 						</div>
 					) : null}
 				</div>

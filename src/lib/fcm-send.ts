@@ -6,6 +6,11 @@ type PushPayload = {
 	data?: Record<string, string>;
 };
 
+const DEAD_TOKEN_CODES = new Set([
+	'messaging/registration-token-not-registered',
+	'messaging/invalid-registration-token',
+]);
+
 async function getMessaging() {
 	const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 	if (!raw || !String(raw).trim()) {
@@ -22,6 +27,20 @@ async function getMessaging() {
 	} catch (e: any) {
 		console.warn('[fcm-send] init failed', e?.message || e);
 		return null;
+	}
+}
+
+async function pruneDeadTokens(tokens: string[]) {
+	const list = [...new Set(tokens.map((t) => String(t || '').trim()).filter(Boolean))];
+	if (!list.length) return;
+	try {
+		await db.employee.updateMany({
+			where: { fcmToken: { in: list } },
+			data: { fcmToken: null },
+		});
+		console.info('[fcm-send] pruned dead tokens', list.length);
+	} catch (e: any) {
+		console.warn('[fcm-send] prune failed', e?.message || e);
 	}
 }
 
@@ -43,6 +62,8 @@ async function sendToTokenList(tokens: string[], payload: PushPayload) {
 
 	let sent = 0;
 	let failed = 0;
+	const dead: string[] = [];
+
 	for (let i = 0; i < list.length; i += 500) {
 		const chunk = list.slice(i, i + 500);
 		try {
@@ -58,15 +79,38 @@ async function sendToTokenList(tokens: string[], payload: PushPayload) {
 						priority: isSos ? 'max' : 'high',
 					},
 				},
+				apns: {
+					headers: {
+						'apns-priority': isSos ? '10' : '5',
+					},
+					payload: {
+						aps: {
+							sound: 'default',
+							'content-available': 1,
+							...(isSos ? { 'mutable-content': 1 } : {}),
+						},
+					},
+				},
+				webpush: {
+					headers: { Urgency: isSos ? 'high' : 'normal' },
+				},
 			});
 			sent += res.successCount;
 			failed += res.failureCount;
+			res.responses.forEach((r: { success: boolean; error?: { code?: string } }, idx: number) => {
+				if (r.success) return;
+				const code = String(r.error?.code || '');
+				if (DEAD_TOKEN_CODES.has(code)) dead.push(chunk[idx]);
+			});
 		} catch (e: any) {
 			console.error('[fcm-send] multicast error', e?.message || e);
 			failed += chunk.length;
 		}
 	}
-	return { sent, failed, tokens: list.length };
+
+	if (dead.length) await pruneDeadTokens(dead);
+
+	return { sent, failed, tokens: list.length, pruned: dead.length };
 }
 
 /** Send FCM from Vercel directly (does not depend on Render). */

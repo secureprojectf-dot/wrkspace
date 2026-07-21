@@ -80,6 +80,15 @@ function EmployeeShell({
 		void import('@/components/mobile/mobile-app-shell').catch(() => {});
 	}, [isMobile]);
 
+	// Desktop also needs FCM for chat / tasks / SOS (mobile shell registers itself).
+	useEffect(() => {
+		if (isMobile !== false || !employee?.id) return;
+		const t = window.setTimeout(() => {
+			void import('@/lib/web-push').then((m) => m.registerWebPush(employee.id));
+		}, 2500);
+		return () => window.clearTimeout(t);
+	}, [isMobile, employee?.id]);
+
 	if (isMobile === null) return <ShellLoading />;
 
 	if (isMobile) {
@@ -132,8 +141,13 @@ export function AuthPage() {
 					const { refreshEmployeeSession } = await import('@/app/admin/actions');
 					const res = await refreshEmployeeSession(parsed.id);
 					if (res.success && res.employee) {
-						localStorage.setItem('wrkspace_employee_session', JSON.stringify(res.employee));
-						setLoggedInEmployee(res.employee);
+						const existingToken =
+							localStorage.getItem('wrkspace_employee_token') ||
+							String((parsed as { token?: string }).token || '');
+						const next = existingToken ? { ...res.employee, token: existingToken } : res.employee;
+						localStorage.setItem('wrkspace_employee_session', JSON.stringify(next));
+						if (existingToken) localStorage.setItem('wrkspace_employee_token', existingToken);
+						setLoggedInEmployee(next);
 					}
 				}
 			} catch {
