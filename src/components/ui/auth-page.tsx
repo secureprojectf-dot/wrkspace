@@ -5,6 +5,8 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './button';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { SoftErrorBoundary } from '@/components/soft-error-boundary';
+import { importWithRetry } from '@/lib/import-with-retry';
 
 import {
 	AtSignIcon,
@@ -32,12 +34,24 @@ import { signInWithPopup } from 'firebase/auth';
 import { GoogleSignInButton } from './google-sign-in-button';
 
 const MobileAppShell = dynamic(
-	() => import('@/components/mobile/mobile-app-shell').then((m) => m.MobileAppShell),
+	() =>
+		importWithRetry(() =>
+			import('@/components/mobile/mobile-app-shell').then((m) => {
+				if (!m?.MobileAppShell) throw new Error('MobileAppShell export missing');
+				return m.MobileAppShell;
+			}),
+		),
 	{ ssr: false, loading: () => <ShellLoading /> },
 );
 
 const EmployeeDashboard = dynamic(
-	() => import('./employee-dashboard').then((m) => m.EmployeeDashboard),
+	() =>
+		importWithRetry(() =>
+			import('./employee-dashboard').then((m) => {
+				if (!m?.EmployeeDashboard) throw new Error('EmployeeDashboard export missing');
+				return m.EmployeeDashboard;
+			}),
+		),
 	{ ssr: false, loading: () => <ShellLoading /> },
 );
 
@@ -60,27 +74,37 @@ function EmployeeShell({
 }) {
 	const isMobile = useIsMobile();
 
+	// Warm the mobile shell chunk while login is visible / spinner shows
+	useEffect(() => {
+		if (isMobile !== true) return;
+		void import('@/components/mobile/mobile-app-shell').catch(() => {});
+	}, [isMobile]);
+
 	if (isMobile === null) return <ShellLoading />;
 
 	if (isMobile) {
 		return (
+			<SoftErrorBoundary>
+				<Suspense fallback={<ShellLoading />}>
+					<MobileAppShell
+						employee={employee}
+						onLogout={onLogout}
+						onEmployeeUpdate={onEmployeeUpdate}
+					/>
+				</Suspense>
+			</SoftErrorBoundary>
+		);
+	}
+	return (
+		<SoftErrorBoundary>
 			<Suspense fallback={<ShellLoading />}>
-				<MobileAppShell
+				<EmployeeDashboard
 					employee={employee}
 					onLogout={onLogout}
 					onEmployeeUpdate={onEmployeeUpdate}
 				/>
 			</Suspense>
-		);
-	}
-	return (
-		<Suspense fallback={<ShellLoading />}>
-			<EmployeeDashboard
-				employee={employee}
-				onLogout={onLogout}
-				onEmployeeUpdate={onEmployeeUpdate}
-			/>
-		</Suspense>
+		</SoftErrorBoundary>
 	);
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-const FLAG = 'wrkspace_chunk_reload_v1';
+const FLAG = 'wrkspace_chunk_reload_v2';
 
 export default function GlobalError({
 	error,
@@ -12,18 +12,22 @@ export default function GlobalError({
 	reset: () => void;
 }) {
 	useEffect(() => {
+		console.error('[global-error]', error);
 		const msg = `${error?.name ?? ''} ${error?.message ?? ''}`;
 		if (!/ChunkLoadError|Loading chunk|Failed to fetch dynamically imported module/i.test(msg)) {
 			return;
 		}
 		try {
-			if (sessionStorage.getItem(FLAG) === '1') return;
-			sessionStorage.setItem(FLAG, '1');
+			const n = Number(sessionStorage.getItem(FLAG) || '0');
+			if (n >= 2) return;
+			sessionStorage.setItem(FLAG, String(n + 1));
 		} catch {
 			/* still reload */
 		}
 		window.location.reload();
 	}, [error]);
+
+	const detail = error?.message || error?.digest || '';
 
 	return (
 		<html lang="en">
@@ -40,10 +44,28 @@ export default function GlobalError({
 						textAlign: 'center',
 					}}
 				>
-					<p style={{ fontSize: 18, fontWeight: 600 }}>This page couldn’t load</p>
+					<p style={{ fontSize: 18, fontWeight: 600 }}>Something went wrong</p>
 					<p style={{ fontSize: 14, opacity: 0.7, maxWidth: 360 }}>
-						Tap Reload. After a site update, one reload usually fixes it.
+						Tap Reload. After a site update, one or two reloads usually fix it.
 					</p>
+					{detail ? (
+						<p
+							style={{
+								fontSize: 11,
+								fontFamily: 'ui-monospace, monospace',
+								opacity: 0.85,
+								color: '#fde68a',
+								maxWidth: 360,
+								wordBreak: 'break-word',
+								textAlign: 'left',
+								background: 'rgba(255,255,255,0.06)',
+								padding: '8px 12px',
+								borderRadius: 8,
+							}}
+						>
+							{detail}
+						</p>
+					) : null}
 					<div style={{ display: 'flex', gap: 12 }}>
 						<button
 							type="button"

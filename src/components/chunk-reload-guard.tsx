@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-const FLAG = 'wrkspace_chunk_reload_v1';
+const FLAG = 'wrkspace_chunk_reload_v2';
 
 function isChunkFailure(reason: unknown): boolean {
 	const msg =
@@ -14,48 +14,45 @@ function isChunkFailure(reason: unknown): boolean {
 	);
 }
 
-function reloadOnce() {
+function takeReloadSlot(): boolean {
 	try {
-		if (sessionStorage.getItem(FLAG) === '1') return;
-		sessionStorage.setItem(FLAG, '1');
+		const n = Number(sessionStorage.getItem(FLAG) || '0');
+		if (n >= 2) return false;
+		sessionStorage.setItem(FLAG, String(n + 1));
+		return true;
 	} catch {
-		/* still reload once */
+		return true;
 	}
-	window.location.reload();
 }
 
 /**
- * After deploy / cache clear, dynamic imports can 404 briefly.
- * One guarded reload recovers instead of Next.js "This page couldn't load".
+ * After deploy / cache clear, dynamic imports can flake once or twice.
+ * Guarded reloads recover instead of sticking on the error screen.
  */
 export function ChunkReloadGuard() {
 	useEffect(() => {
 		const onRejection = (ev: PromiseRejectionEvent) => {
-			if (isChunkFailure(ev.reason)) {
+			if (isChunkFailure(ev.reason) && takeReloadSlot()) {
 				ev.preventDefault();
-				reloadOnce();
+				window.location.reload();
 			}
 		};
 		const onError = (ev: ErrorEvent) => {
-			if (isChunkFailure(ev.error ?? ev.message)) {
-				reloadOnce();
+			if (isChunkFailure(ev.error ?? ev.message) && takeReloadSlot()) {
+				window.location.reload();
 			}
 		};
 		window.addEventListener('unhandledrejection', onRejection);
 		window.addEventListener('error', onError);
-		try {
-			// Clear flag after a successful settled load
-			window.setTimeout(() => {
-				try {
-					sessionStorage.removeItem(FLAG);
-				} catch {
-					/* ignore */
-				}
-			}, 12_000);
-		} catch {
-			/* ignore */
-		}
+		const t = window.setTimeout(() => {
+			try {
+				sessionStorage.removeItem(FLAG);
+			} catch {
+				/* ignore */
+			}
+		}, 20_000);
 		return () => {
+			window.clearTimeout(t);
 			window.removeEventListener('unhandledrejection', onRejection);
 			window.removeEventListener('error', onError);
 		};

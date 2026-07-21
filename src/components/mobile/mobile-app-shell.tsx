@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { CorpBottomNav } from './corp-bottom-nav';
+import { MobileHomeTab } from './tabs/home-tab';
 import {
 	clearOfficeExitPending,
 	markOfficeExitPending,
@@ -11,6 +12,7 @@ import {
 } from './use-mobile-tracking';
 import { keepCheckedIn, clockOut, startGoingHomeTrip } from '@/app/admin/actions';
 import { ensureLocationPermission, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
+import { importWithRetry } from '@/lib/import-with-retry';
 
 const AUTO_CHECKOUT_MS = 5 * 60 * 1000;
 
@@ -22,44 +24,67 @@ function TabLoading() {
 	);
 }
 
-const MobileHomeTab = dynamic(
-	() => import('./tabs/home-tab').then((m) => m.MobileHomeTab),
-	{ ssr: false, loading: () => <TabLoading /> },
-);
 const MobileTasksTab = dynamic(
-	() => import('./tabs/tasks-tab').then((m) => m.MobileTasksTab),
+	() =>
+		importWithRetry(() =>
+			import('./tabs/tasks-tab').then((m) => m.MobileTasksTab),
+		),
 	{ ssr: false, loading: () => <TabLoading /> },
 );
 const MobileMessagesTab = dynamic(
-	() => import('./tabs/messages-tab').then((m) => m.MobileMessagesTab),
+	() =>
+		importWithRetry(() =>
+			import('./tabs/messages-tab').then((m) => m.MobileMessagesTab),
+		),
 	{ ssr: false, loading: () => <TabLoading /> },
 );
 const MobileMoreTab = dynamic(
-	() => import('./tabs/more-tab').then((m) => m.MobileMoreTab),
+	() =>
+		importWithRetry(() =>
+			import('./tabs/more-tab').then((m) => m.MobileMoreTab),
+		),
 	{ ssr: false, loading: () => <TabLoading /> },
 );
 const MobileScannerScreen = dynamic(
-	() => import('./scanner-screen').then((m) => m.MobileScannerScreen),
+	() =>
+		importWithRetry(() =>
+			import('./scanner-screen').then((m) => m.MobileScannerScreen),
+		),
 	{ ssr: false },
 );
 const MobileSafetyHub = dynamic(
-	() => import('./safety/safety-hub').then((m) => m.MobileSafetyHub),
+	() =>
+		importWithRetry(() =>
+			import('./safety/safety-hub').then((m) => m.MobileSafetyHub),
+		),
 	{ ssr: false },
 );
 const MobileEmergencySos = dynamic(
-	() => import('./safety/emergency-sos').then((m) => m.MobileEmergencySos),
+	() =>
+		importWithRetry(() =>
+			import('./safety/emergency-sos').then((m) => m.MobileEmergencySos),
+		),
 	{ ssr: false },
 );
 const MobileHomePin = dynamic(
-	() => import('./safety/home-pin').then((m) => m.MobileHomePin),
+	() =>
+		importWithRetry(() =>
+			import('./safety/home-pin').then((m) => m.MobileHomePin),
+		),
 	{ ssr: false },
 );
 const MobileTripHistory = dynamic(
-	() => import('./safety/trip-history').then((m) => m.MobileTripHistory),
+	() =>
+		importWithRetry(() =>
+			import('./safety/trip-history').then((m) => m.MobileTripHistory),
+		),
 	{ ssr: false },
 );
 const EmployeeDashboard = dynamic(
-	() => import('@/components/ui/employee-dashboard').then((m) => m.EmployeeDashboard),
+	() =>
+		importWithRetry(() =>
+			import('@/components/ui/employee-dashboard').then((m) => m.EmployeeDashboard),
+		),
 	{ ssr: false },
 );
 
