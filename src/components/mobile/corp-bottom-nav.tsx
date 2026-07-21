@@ -87,17 +87,17 @@ export function CorpBottomNav({
 				}}
 			>
 				<NavBtn active={section === 'home'} onClick={onHome} label="Home">
-					<Home className="size-[24px]" strokeWidth={2} />
+					<Home className="size-[22px]" strokeWidth={2} />
 				</NavBtn>
 				<NavBtn active={section === 'tasks'} onClick={onTasks} label="Tasks">
-					<ListTodo className="size-[24px]" strokeWidth={2} />
+					<ListTodo className="size-[22px]" strokeWidth={2} />
 				</NavBtn>
 				<div style={{ width: FAB + 8 }} className="shrink-0" aria-hidden />
 				<NavBtn active={section === 'messages'} onClick={onMessages} label="Messages">
-					<MessagesSquare className="size-[24px]" strokeWidth={2} />
+					<MessagesSquare className="size-[22px]" strokeWidth={2} />
 				</NavBtn>
 				<NavBtn active={section === 'more'} onClick={onMore} label="More">
-					<LayoutGrid className="size-[24px]" strokeWidth={2} />
+					<LayoutGrid className="size-[22px]" strokeWidth={2} />
 				</NavBtn>
 			</div>
 
@@ -140,17 +140,28 @@ function NavBtn({
 	label: string;
 	children: React.ReactNode;
 }) {
+	const isMessages = label === 'Messages';
 	return (
 		<button
 			type="button"
 			aria-label={label}
 			onClick={onClick}
 			className={cn(
-				'flex h-10 flex-1 items-center justify-center',
+				'flex h-12 flex-1 flex-col items-center justify-center gap-0.5',
 				active ? 'text-white' : 'text-[#B8C4FF]',
 			)}
 		>
 			{children}
+			<span
+				className={cn(
+					'whitespace-nowrap font-semibold leading-none',
+					isMessages ? 'text-[11px]' : 'text-[10.5px]',
+					active ? 'font-bold' : 'font-semibold',
+				)}
+				style={isMessages ? { letterSpacing: '-0.15px' } : { letterSpacing: '0.1px' }}
+			>
+				{label}
+			</span>
 		</button>
 	);
 }

@@ -118,7 +118,7 @@ export function MobileMoreTab({ employee, onOpenPanel, onLogout, onProfile }: Pr
 
 				<div className="mt-7 flex items-center px-1 text-xs font-semibold text-[#64748B]">
 					<span>wrkspace</span>
-					<span className="ml-auto font-medium">web app · 1.0.0</span>
+					<span className="ml-auto font-medium">version 2</span>
 				</div>
 			</div>
 		</div>
