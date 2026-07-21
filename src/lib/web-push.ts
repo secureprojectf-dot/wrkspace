@@ -73,8 +73,9 @@ export async function registerWebPush(_employeeId?: string) {
 
 		const vapid = (process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '').trim();
 		if (!vapid) {
-			console.warn('[web-push] NEXT_PUBLIC_FIREBASE_VAPID_KEY is not set — cannot get FCM token');
-			return;
+			console.warn(
+				'[web-push] NEXT_PUBLIC_FIREBASE_VAPID_KEY is not set — trying getToken without it (may fail)',
+			);
 		}
 
 		// Scope under /api/firebase-messaging-sw/ only — never claim the whole origin.
@@ -87,7 +88,7 @@ export async function registerWebPush(_employeeId?: string) {
 		const app = getApps().length ? getApp() : initializeApp(config);
 		const messaging = getMessaging(app);
 		const token = await getToken(messaging, {
-			vapidKey: vapid,
+			...(vapid ? { vapidKey: vapid } : {}),
 			serviceWorkerRegistration: registration,
 		}).catch((e) => {
 			console.warn('[web-push] getToken failed', e);
