@@ -1311,7 +1311,14 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 												<div className="pt-3 border-t border-zinc-900 text-[11px] text-zinc-400 flex items-center justify-between">
 													<span className="font-mono">{fmt(startD)}</span>
 													<button
-														onClick={() => { window.location.href = `/events/${event.id}`; }}
+														onClick={() => {
+															const url = `/events/${event.id}`;
+															if (mobilePanelTab) {
+																window.open(url, '_blank', 'noopener,noreferrer');
+															} else {
+																window.location.href = url;
+															}
+														}}
 														className="text-brand-600 hover:text-brand-800 font-bold text-xs uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors"
 													>
 														View Details →
