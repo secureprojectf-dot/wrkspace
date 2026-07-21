@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -20,6 +20,17 @@ const inter = Inter({
   weight: ["400", "500", "600", "700", "800"],
 });
 
+/** Brand navy — iOS PWA status bar / theme chrome */
+const BRAND_BLUE = "#0047FF";
+
+export const viewport: Viewport = {
+  themeColor: BRAND_BLUE,
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  colorScheme: "light",
+};
+
 export const metadata: Metadata = {
   title: "wrkspace",
   description: "A firm of software and IT wing",
@@ -29,7 +40,8 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "wrkspace",
-    statusBarStyle: "default",
+    // Translucent so brand blue (safe-area fill) shows behind the clock/signal bar
+    statusBarStyle: "black-translucent",
   },
   manifest: "/manifest.webmanifest",
   icons: {

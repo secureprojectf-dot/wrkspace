@@ -24,7 +24,8 @@ export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 			<div
 				className="px-5 pb-5"
 				style={{
-					paddingTop: 'max(16px, env(safe-area-inset-top))',
+					// Shell already paints env(safe-area-inset-top) in brand blue
+					paddingTop: 16,
 				}}
 			>
 				<div className="flex flex-col">

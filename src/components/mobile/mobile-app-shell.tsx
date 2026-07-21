@@ -309,6 +309,13 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 					'var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif',
 			}}
 		>
+			{/* iOS PWA status bar (clock / signal) — always brand blue, never amber banners */}
+			<div
+				className="shrink-0 bg-[#0047FF]"
+				style={{ height: 'env(safe-area-inset-top, 0px)' }}
+				aria-hidden
+			/>
+
 			{installHint ? (
 				<div className="z-50 flex items-start gap-2 bg-[#0047FF] px-3 py-2 text-[12px] font-medium text-white">
 					<p className="min-w-0 flex-1">
