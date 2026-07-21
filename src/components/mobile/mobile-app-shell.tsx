@@ -53,6 +53,11 @@ const PANEL_TITLES: Record<string, string> = {
 
 const SAFETY_KEYS = new Set(['safety', 'sos', 'home_pin', 'trips']);
 
+/**
+ * Mobile shell with an in-app back trap.
+ * Never call history.back() / about:blank — those unload the SPA on Android Chrome
+ * and show "This page couldn't load".
+ */
 export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) {
 	const [section, setSection] = useState<Section>('home');
 	const [scannerOpen, setScannerOpen] = useState(false);
@@ -71,7 +76,6 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	const sectionRef = useRef<Section>('home');
 	const chatOpenRef = useRef(false);
 	const scannerRef = useRef(false);
-	const pushing = useRef(false);
 
 	panelStackRef.current = panelStack;
 	sectionRef.current = section;
@@ -106,12 +110,6 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 			return;
 		}
 		setPanelStack((s) => [...s, key]);
-		pushing.current = true;
-		try {
-			window.history.pushState({ wrkspacePanel: key }, '');
-		} finally {
-			pushing.current = false;
-		}
 	}, []);
 
 	const popPanel = useCallback(() => {
@@ -123,25 +121,20 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 		if (lastBackAt.current && now - lastBackAt.current < 2000) {
 			lastBackAt.current = 0;
 			setExitToast(false);
+			// Stay on the SPA — never navigate to about:blank (breaks Android Chrome).
 			try {
 				window.close();
 			} catch {
-				/* ignore */
+				/* browsers block this unless opened by script */
 			}
-			window.location.href = 'about:blank';
 			return;
 		}
 		lastBackAt.current = now;
 		setExitToast(true);
 		window.setTimeout(() => setExitToast(false), 2000);
-		pushing.current = true;
-		try {
-			window.history.pushState({ wrkspaceRoot: true }, '');
-		} finally {
-			pushing.current = false;
-		}
 	}, []);
 
+	/** Handle Android/iOS browser back without leaving the document. */
 	const handleSystemBack = useCallback(() => {
 		if (scannerRef.current) {
 			setScannerOpen(false);
@@ -164,29 +157,24 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	}, [popPanel, tryExitApp]);
 
 	useEffect(() => {
-		pushing.current = true;
-		try {
-			window.history.replaceState({ wrkspaceRoot: true }, '');
-		} finally {
-			pushing.current = false;
-		}
+		const trap = () => {
+			try {
+				window.history.pushState({ wrkspaceTrap: 1 }, '', window.location.href);
+			} catch {
+				/* ignore */
+			}
+		};
+		// Seed one trap entry so the first hardware Back stays inside the app.
+		trap();
+
 		const onPop = () => {
-			if (pushing.current) return;
 			handleSystemBack();
+			// Re-arm immediately so history never walks off the SPA document.
+			trap();
 		};
 		window.addEventListener('popstate', onPop);
 		return () => window.removeEventListener('popstate', onPop);
 	}, [handleSystemBack]);
-
-	useEffect(() => {
-		if (!messagesChatOpen) return;
-		pushing.current = true;
-		try {
-			window.history.pushState({ wrkspaceChat: true }, '');
-		} finally {
-			pushing.current = false;
-		}
-	}, [messagesChatOpen]);
 
 	const handleLeaveChoice = async (mode: 'office_work' | 'going_home') => {
 		if (leaveBusy) return;
@@ -223,14 +211,6 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 		const status = await ensureLocationPermission({ forcePrompt: true });
 		setLocStatus(status);
 		setLocBannerDismissed(false);
-	};
-
-	const goBackUi = () => {
-		if (window.history.state?.wrkspacePanel) {
-			window.history.back();
-		} else {
-			popPanel();
-		}
 	};
 
 	return (
@@ -348,7 +328,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 					<div className="flex items-center gap-2 border-b border-[#E2E8F0] bg-white px-2 py-2.5 pt-[max(10px,env(safe-area-inset-top))]">
 						<button
 							type="button"
-							onClick={goBackUi}
+							onClick={popPanel}
 							className="rounded-lg px-3 py-2 text-sm font-semibold text-[#0047FF]"
 						>
 							← Back
