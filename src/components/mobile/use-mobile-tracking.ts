@@ -5,12 +5,42 @@ import { apiGet, apiPost, getPosition, isFemaleEmployee } from '@/lib/mobile-api
 
 const OFFICE_WATCH_MS = 45_000;
 const HOME_WATCH_MS = 25_000;
-/** Leave-office exit fence — never use check-in radiusMeters (75) for this. */
 const EXIT_GEOFENCE_M = 300;
-/** Ignore GPS samples worse than this (meters). */
 const MAX_ACCURACY_M = 80;
-/** Need this many consecutive "outside" ticks before prompting. */
 const OUTSIDE_CONFIRM_TICKS = 2;
+
+export const OFFICE_EXIT_KEY = 'wrkspace_office_exit_pending';
+
+export function markOfficeExitPending() {
+	try {
+		sessionStorage.setItem(
+			OFFICE_EXIT_KEY,
+			JSON.stringify({ at: Date.now(), status: 'pending' }),
+		);
+	} catch {
+		/* ignore */
+	}
+}
+
+export function clearOfficeExitPending() {
+	try {
+		sessionStorage.removeItem(OFFICE_EXIT_KEY);
+	} catch {
+		/* ignore */
+	}
+}
+
+export function readOfficeExitPending(): { at: number } | null {
+	try {
+		const raw = sessionStorage.getItem(OFFICE_EXIT_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as { at?: number; status?: string };
+		if (!parsed?.at || parsed.status === 'done') return null;
+		return { at: Number(parsed.at) };
+	} catch {
+		return null;
+	}
+}
 
 function distM(aLat: number, aLng: number, bLat: number, bLng: number) {
 	const R = 6371000;
@@ -25,7 +55,6 @@ function distM(aLat: number, aLng: number, bLat: number, bLng: number) {
 
 function exitRadiusM(o: { geofenceM?: number }) {
 	const g = Number(o.geofenceM);
-	// Only trust a positive geofenceM — never fall back to check-in radius (75m).
 	return Number.isFinite(g) && g > 0 ? g : EXIT_GEOFENCE_M;
 }
 
@@ -36,10 +65,6 @@ type Opts = {
 	onLocationError?: () => void;
 };
 
-/**
- * Foreground tracking while the mobile web app is open (PWA / Safari).
- * Leave-office prompt only after leaving the ~300m exit fence with good GPS.
- */
 export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocationError }: Opts) {
 	const leavePrompted = useRef(false);
 	const wasInsideExit = useRef(false);
@@ -81,6 +106,14 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocation
 			}
 		};
 
+		const fireLeavePrompt = async () => {
+			leavePrompted.current = true;
+			wasInsideExit.current = false;
+			markOfficeExitPending();
+			await apiPost('/api/attendance/left-office', {}).catch(() => {});
+			onLeaveOffice?.();
+		};
+
 		const tickOffice = async () => {
 			if (!alive) return;
 			try {
@@ -92,7 +125,15 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocation
 					leavePrompted.current = false;
 					wasInsideExit.current = false;
 					outsideStreak.current = 0;
+					clearOfficeExitPending();
 					return;
+				}
+
+				// Already pending a choice (e.g. from push) — keep UI in sync
+				const pending = readOfficeExitPending();
+				if (pending && !leavePrompted.current) {
+					leavePrompted.current = true;
+					onLeaveOffice?.();
 				}
 
 				const pos = await getPosition(15000);
@@ -100,7 +141,6 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocation
 				const { latitude: lat, longitude: lng, accuracy } = pos.coords;
 				await apiPost('/api/attendance/location', { lat, lng }).catch(() => {});
 
-				// Bad / coarse GPS — do not treat as left office (common indoors).
 				if (typeof accuracy === 'number' && accuracy > MAX_ACCURACY_M) {
 					return;
 				}
@@ -118,28 +158,25 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocation
 
 				if (!nearest) return;
 
-				// Buffer: accuracy circle must be fully outside fence before we count "outside".
 				const acc = typeof accuracy === 'number' && accuracy > 0 ? accuracy : 25;
 				const outside = nearest.d > nearest.r + Math.min(acc, 60);
 
 				if (!outside) {
 					wasInsideExit.current = true;
 					outsideStreak.current = 0;
-					leavePrompted.current = false;
+					if (!readOfficeExitPending()) {
+						leavePrompted.current = false;
+					}
 					return;
 				}
 
-				// Must have been inside the fence at least once this shift (or confirm twice).
 				outsideStreak.current += 1;
 				const confirmed =
 					outsideStreak.current >= OUTSIDE_CONFIRM_TICKS &&
 					(wasInsideExit.current || nearest.d > nearest.r + 100);
 
 				if (confirmed && !leavePrompted.current) {
-					leavePrompted.current = true;
-					wasInsideExit.current = false;
-					await apiPost('/api/attendance/left-office', {}).catch(() => {});
-					onLeaveOffice?.();
+					await fireLeavePrompt();
 				}
 			} catch {
 				failLoc();

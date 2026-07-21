@@ -1,9 +1,28 @@
 'use client';
 
-import { getMessaging, getToken, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { getApps, getApp, initializeApp } from 'firebase/app';
 import { employeeToken } from '@/lib/mobile-api';
 import { getFirebasePublicConfig } from '@/lib/firebase-public-config';
+
+/** Foreground push: open leave-office dialog when type=office_exit. */
+export async function subscribeOfficeExitPush(onOfficeExit: () => void) {
+	if (typeof window === 'undefined') return;
+	try {
+		const config = getFirebasePublicConfig();
+		if (!config) return;
+		const ok = await isSupported();
+		if (!ok) return;
+		const app = getApps().length ? getApp() : initializeApp(config);
+		const messaging = getMessaging(app);
+		onMessage(messaging, (payload) => {
+			const type = String(payload.data?.type || '');
+			if (type === 'office_exit') onOfficeExit();
+		});
+	} catch {
+		/* optional */
+	}
+}
 
 /**
  * Register FCM web push when supported.

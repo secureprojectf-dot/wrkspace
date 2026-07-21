@@ -14,15 +14,35 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || payload.data?.title || 'wrkspace';
   const body = payload.notification?.body || payload.data?.body || '';
+  const data = Object.assign({}, payload.data || {}, {
+    type: (payload.data && payload.data.type) || '',
+  });
   self.registration.showNotification(title, {
     body,
     icon: '/icon.png',
-    data: payload.data || {},
+    data,
+    tag: data.type === 'office_exit' ? 'office-exit' : undefined,
+    renotify: data.type === 'office_exit',
   });
 });
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/'));
+  const data = event.notification.data || {};
+  const officeExit = data.type === 'office_exit';
+  const targetUrl = officeExit ? '/?office_exit=1' : '/';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          try {
+            client.postMessage({ type: officeExit ? 'office_exit' : 'open' });
+          } catch (_) {}
+          return client.focus();
+        }
+      }
+      return clients.openWindow(targetUrl);
+    })
+  );
 });
 `
 		: `/* Firebase not configured */\nself.addEventListener('install', () => self.skipWaiting());\n`;

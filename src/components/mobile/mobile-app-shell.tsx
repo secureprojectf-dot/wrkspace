@@ -7,7 +7,12 @@ import { MobileTasksTab } from './tabs/tasks-tab';
 import { MobileMessagesTab } from './tabs/messages-tab';
 import { MobileMoreTab } from './tabs/more-tab';
 import { MobileScannerScreen } from './scanner-screen';
-import { useMobileTracking } from './use-mobile-tracking';
+import {
+	clearOfficeExitPending,
+	markOfficeExitPending,
+	readOfficeExitPending,
+	useMobileTracking,
+} from './use-mobile-tracking';
 import { MobileSafetyHub } from './safety/safety-hub';
 import { MobileEmergencySos } from './safety/emergency-sos';
 import { MobileHomePin } from './safety/home-pin';
@@ -15,7 +20,9 @@ import { MobileTripHistory } from './safety/trip-history';
 import { EmployeeDashboard } from '@/components/ui/employee-dashboard';
 import { keepCheckedIn, clockOut, startGoingHomeTrip } from '@/app/admin/actions';
 import { ensureLocationPermission, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
-import { registerWebPush } from '@/lib/web-push';
+import { registerWebPush, subscribeOfficeExitPush } from '@/lib/web-push';
+
+const AUTO_CHECKOUT_MS = 5 * 60 * 1000;
 
 type Section = 'home' | 'tasks' | 'messages' | 'more';
 
@@ -65,14 +72,31 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	const [panelStack, setPanelStack] = useState<string[]>([]);
 	const [leaveOpen, setLeaveOpen] = useState(false);
 	const [leaveBusy, setLeaveBusy] = useState(false);
+	const [leaveSecondsLeft, setLeaveSecondsLeft] = useState(300);
 	const [installHint, setInstallHint] = useState(false);
 	const [messagesChatOpen, setMessagesChatOpen] = useState(false);
 	const [closeChatSignal, setCloseChatSignal] = useState(0);
 	const [locStatus, setLocStatus] = useState<'ok' | 'denied' | 'prompt' | 'unsupported'>('prompt');
 	const [locBannerDismissed, setLocBannerDismissed] = useState(false);
 	const pushStarted = useRef(false);
+	const leaveTimerRef = useRef<number | undefined>(undefined);
+	const leaveTickRef = useRef<number | undefined>(undefined);
+	const leaveBusyRef = useRef(false);
 
 	const panel = panelStack[panelStack.length - 1] ?? null;
+	leaveBusyRef.current = leaveBusy;
+
+	const openLeaveDialog = useCallback(() => {
+		markOfficeExitPending();
+		setLeaveOpen(true);
+	}, []);
+
+	const clearLeaveTimers = useCallback(() => {
+		if (leaveTimerRef.current) window.clearTimeout(leaveTimerRef.current);
+		if (leaveTickRef.current) window.clearInterval(leaveTickRef.current);
+		leaveTimerRef.current = undefined;
+		leaveTickRef.current = undefined;
+	}, []);
 
 	useEffect(() => {
 		document.documentElement.classList.remove('dark');
@@ -83,31 +107,84 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 			window.matchMedia('(display-mode: standalone)').matches;
 		if (ios && !standalone) setInstallHint(true);
 
-		// Location after first paint — never block UI
 		const tLoc = window.setTimeout(() => {
 			void ensureLocationPermission().then(setLocStatus);
 		}, 800);
 
-		// Push much later so SW registration cannot race first taps
 		const tPush = window.setTimeout(() => {
 			if (pushStarted.current) return;
 			pushStarted.current = true;
-			void registerWebPush(employee?.id);
-		}, 4000);
+			void registerWebPush(employee?.id).then(() => {
+				void subscribeOfficeExitPush(() => openLeaveDialog());
+			});
+		}, 2500);
+
+		// Restore pending leave choice (notification tap / prior session)
+		const params = new URLSearchParams(window.location.search);
+		if (params.get('office_exit') === '1' || readOfficeExitPending()) {
+			openLeaveDialog();
+			if (params.get('office_exit') === '1') {
+				params.delete('office_exit');
+				const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+				window.history.replaceState(null, '', next);
+			}
+		}
+
+		const onMsg = (ev: MessageEvent) => {
+			if (ev.data?.type === 'office_exit') openLeaveDialog();
+		};
+		navigator.serviceWorker?.addEventListener('message', onMsg);
 
 		return () => {
 			window.clearTimeout(tLoc);
 			window.clearTimeout(tPush);
+			navigator.serviceWorker?.removeEventListener('message', onMsg);
+			clearLeaveTimers();
 		};
-	}, [employee?.id]);
+	}, [employee?.id, openLeaveDialog, clearLeaveTimers]);
 
-	const onLeaveOffice = useCallback(() => setLeaveOpen(true), []);
 	useMobileTracking({
 		employee,
 		enabled: locStatus === 'ok',
-		onLeaveOffice,
+		onLeaveOffice: openLeaveDialog,
 		onLocationError: () => setLocStatus('denied'),
 	});
+
+	// 5 min no reply → auto check-out (Flutter parity)
+	useEffect(() => {
+		if (!leaveOpen) {
+			clearLeaveTimers();
+			return;
+		}
+		const pending = readOfficeExitPending();
+		const startedAt = pending?.at || Date.now();
+		if (!pending) markOfficeExitPending();
+
+		const tick = () => {
+			const elapsed = Date.now() - startedAt;
+			const left = Math.max(0, Math.ceil((AUTO_CHECKOUT_MS - elapsed) / 1000));
+			setLeaveSecondsLeft(left);
+		};
+		tick();
+		leaveTickRef.current = window.setInterval(tick, 1000);
+
+		const remaining = Math.max(0, AUTO_CHECKOUT_MS - (Date.now() - startedAt));
+		leaveTimerRef.current = window.setTimeout(() => {
+			if (leaveBusyRef.current) return;
+			void (async () => {
+				try {
+					await clockOut(employee.id, 'outside_geofence_timeout');
+				} catch {
+					/* ignore */
+				}
+				clearOfficeExitPending();
+				setLeaveOpen(false);
+				setRefreshToken((n) => n + 1);
+			})();
+		}, remaining);
+
+		return () => clearLeaveTimers();
+	}, [leaveOpen, employee.id, clearLeaveTimers]);
 
 	const openPanel = useCallback((key: string) => {
 		if (key === 'tasks') {
@@ -132,6 +209,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	const handleLeaveChoice = async (mode: 'office_work' | 'going_home') => {
 		if (leaveBusy) return;
 		setLeaveBusy(true);
+		clearLeaveTimers();
 		try {
 			if (mode === 'office_work') {
 				await keepCheckedIn(employee.id, 'office_work');
@@ -146,6 +224,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 					}
 				}
 			}
+			clearOfficeExitPending();
 			setLeaveOpen(false);
 			setRefreshToken((n) => n + 1);
 		} catch {
@@ -323,6 +402,10 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 							{isFemaleEmployee(employee)
 								? 'Outside office — choose within 5 min. Office work stays checked in. Going home checks out + live track until home.'
 								: 'Outside office — choose within 5 min. Office work stays checked in. Going home checks you out.'}
+						</p>
+						<p className="mt-2 text-xs font-semibold text-[#B42318]">
+							No reply → auto check-out in {Math.floor(leaveSecondsLeft / 60)}:
+							{String(leaveSecondsLeft % 60).padStart(2, '0')}
 						</p>
 						<div className="mt-4 flex flex-col gap-2">
 							<button
