@@ -9,7 +9,7 @@ type Props = {
 	onProfile?: () => void;
 };
 
-/** Flutter CorpPageHeader — Inter/sans, logo mark, 22px name. */
+/** Flutter CorpPageHeader — flexible height (no fixed overflow). */
 export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 	const name = employeeDisplayName(employee);
 	return (
@@ -22,13 +22,12 @@ export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 			}}
 		>
 			<div
-				className="px-5 pb-6"
+				className="px-5 pb-5"
 				style={{
 					paddingTop: 'max(16px, env(safe-area-inset-top))',
-					minHeight: 'calc(152px + env(safe-area-inset-top))',
 				}}
 			>
-				<div className="flex h-[152px] flex-col justify-center">
+				<div className="flex flex-col">
 					<div className="flex items-center gap-3">
 						<div className="min-w-0 flex-1">
 							<img
@@ -56,12 +55,12 @@ export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 								id={employee?.id}
 								name={name}
 								photoUrl={employee?.photoUrl}
-								size={52}
+								size={48}
 							/>
 						</button>
 					</div>
 					<p
-						className="mt-3.5 truncate leading-tight text-white"
+						className="mt-3 truncate leading-[1.15] text-white"
 						style={{
 							fontSize: 22,
 							fontWeight: 700,
@@ -73,7 +72,7 @@ export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 					</p>
 					{subtitle ? (
 						<p
-							className="mt-[5px] truncate text-white/80"
+							className="mt-1 truncate leading-[1.2] text-white/80"
 							style={{ fontSize: 13.5, fontWeight: 500, fontFamily: 'inherit' }}
 						>
 							{subtitle}

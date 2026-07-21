@@ -16,9 +16,8 @@ type Props = {
 };
 
 /**
- * Exact Flutter CorpBottomNav geometry (pixel path, NOT stretched):
- * FAB 62 · bar 64 · dock = bar+18 · FAB bottom = bar-22
- * viewBox matches dock height so the U-notch leaves a gap around the circle.
+ * Flutter CorpBottomNav geometry — taller dock for readable labels.
+ * FAB 64 · bar 76 · dock = bar+18 · FAB bottom = bar-24
  */
 export function CorpBottomNav({
 	section,
@@ -31,19 +30,17 @@ export function CorpBottomNav({
 }: Props) {
 	if (hidden) return null;
 
-	// Flutter constants (no safe-area in these numbers — safe-area added only as padding)
-	const FAB = 62;
-	const BAR = 64;
-	const DOCK = BAR + 18; // 82
-	const SHELL = BAR + 36; // 100 — room for FAB peeking above dock
-	const FAB_BOTTOM = BAR - 22; // 42
+	const FAB = 64;
+	const BAR = 76;
+	const DOCK = BAR + 18; // 94
+	const SHELL = BAR + 40; // 116
+	const FAB_BOTTOM = BAR - 24; // 52
 
 	return (
 		<div
 			className="pointer-events-none fixed inset-x-0 bottom-0 z-50"
 			style={{ height: `calc(${SHELL}px + env(safe-area-inset-bottom, 0px))` }}
 		>
-			{/* Dock — viewBox height === rendered dock height (no vertical warp) */}
 			<svg
 				className="pointer-events-none absolute inset-x-0 bottom-0 w-full"
 				style={{
@@ -62,12 +59,8 @@ export function CorpBottomNav({
 						<stop offset="42%" stopColor="#0047FF" stopOpacity="0" />
 					</linearGradient>
 				</defs>
-				{/*
-				  Flutter _DockPainter in a ${DOCK}-tall canvas:
-				  top=16, notchDepth=28, notchHalf=42 → notch floor at y=44
-				*/}
 				<path
-					d={`M0 ${DOCK} V24 Q0 16 12 16 H141 C156 16 164 44 195 44 C226 44 234 16 249 16 H378 Q390 16 390 24 V${DOCK} Z`}
+					d={`M0 ${DOCK} V24 Q0 16 12 16 H139 C154 16 162 44 195 44 C228 44 236 16 251 16 H378 Q390 16 390 24 V${DOCK} Z`}
 					fill="#0047FF"
 					filter="url(#wsDockShadow)"
 				/>
@@ -77,13 +70,12 @@ export function CorpBottomNav({
 				/>
 			</svg>
 
-			{/* Icons sit in the flat dock band under the notch */}
 			<div
-				className="pointer-events-auto absolute inset-x-0 bottom-0 flex w-full items-center px-1.5"
+				className="pointer-events-auto absolute inset-x-0 bottom-0 flex w-full items-center px-1"
 				style={{
 					height: `calc(${BAR}px + env(safe-area-inset-bottom, 0px))`,
-					paddingTop: 20,
-					paddingBottom: 'max(8px, calc(env(safe-area-inset-bottom, 0px) * 0.35 + 4px))',
+					paddingTop: 16,
+					paddingBottom: 'max(8px, calc(env(safe-area-inset-bottom, 0px) * 0.3 + 4px))',
 				}}
 			>
 				<NavBtn active={section === 'home'} onClick={onHome} label="Home">
@@ -94,14 +86,13 @@ export function CorpBottomNav({
 				</NavBtn>
 				<div style={{ width: FAB + 8 }} className="shrink-0" aria-hidden />
 				<NavBtn active={section === 'messages'} onClick={onMessages} label="Messages">
-					<MessagesSquare className="size-[22px]" strokeWidth={2} />
+					<MessagesSquare className="size-[24px]" strokeWidth={2} />
 				</NavBtn>
 				<NavBtn active={section === 'more'} onClick={onMore} label="More">
 					<LayoutGrid className="size-[22px]" strokeWidth={2} />
 				</NavBtn>
 			</div>
 
-			{/* Perfect circle FAB — white ring creates visible gap vs blue notch */}
 			<button
 				type="button"
 				aria-label="Scan QR to check in"
@@ -123,7 +114,7 @@ export function CorpBottomNav({
 					appearance: 'none',
 				}}
 			>
-				<QrCode className="size-[26px]" strokeWidth={2.2} />
+				<QrCode className="size-[27px]" strokeWidth={2.2} />
 			</button>
 		</div>
 	);
@@ -147,18 +138,18 @@ function NavBtn({
 			aria-label={label}
 			onClick={onClick}
 			className={cn(
-				'flex h-12 flex-1 flex-col items-center justify-center gap-0.5',
+				'flex min-h-[52px] flex-1 flex-col items-center justify-center gap-[3px]',
 				active ? 'text-white' : 'text-[#B8C4FF]',
 			)}
 		>
 			{children}
 			<span
 				className={cn(
-					'whitespace-nowrap font-semibold leading-none',
-					isMessages ? 'text-[11px]' : 'text-[10.5px]',
+					'whitespace-nowrap leading-none',
+					isMessages ? 'text-[12.5px]' : 'text-[11.5px]',
 					active ? 'font-bold' : 'font-semibold',
 				)}
-				style={isMessages ? { letterSpacing: '-0.15px' } : { letterSpacing: '0.1px' }}
+				style={isMessages ? { letterSpacing: '0' } : { letterSpacing: '0.15px' }}
 			>
 				{label}
 			</span>

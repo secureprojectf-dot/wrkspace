@@ -8,6 +8,7 @@ import {
 	FileText,
 	Image as ImageIcon,
 	Lock,
+	MessagesSquare,
 	Paperclip,
 	Pencil,
 	Reply,
@@ -601,7 +602,15 @@ export function MobileMessagesTab({ employee, onChatOpenChange, closeChatSignal 
 						) : error ? (
 							<p className="px-4 py-10 text-center text-sm text-[#B42318]">{error}</p>
 						) : messages.length === 0 ? (
-							<p className="py-16 text-center text-sm text-[#64748B]">No messages yet</p>
+							<div className="flex flex-col items-center justify-center px-8 py-20 text-center">
+								<div className="flex size-[72px] items-center justify-center rounded-[20px] bg-[#E8EFFF] text-[#0047FF]">
+									<MessagesSquare className="size-9" strokeWidth={1.8} />
+								</div>
+								<p className="mt-4 text-[17px] font-bold text-[#0F172A]">No messages yet</p>
+								<p className="mt-1.5 max-w-[260px] text-[13.5px] font-medium leading-snug text-[#64748B]">
+									Say hello — your first message starts this conversation.
+								</p>
+							</div>
 						) : (
 							messages.map((m) => {
 								const mine = isMine(m);
