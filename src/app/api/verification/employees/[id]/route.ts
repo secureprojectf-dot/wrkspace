@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { jsonError, requireVerification } from '@/lib/api-auth';
 import { buildEmployeeInsights } from '@/lib/employee-dossier';
+import { profileFromEmployee } from '@/lib/employee-professional-profile';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,15 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 				lastLat: true,
 				lastLng: true,
 				lastLocationAt: true,
+				about: true,
+				remarks: true,
+				qualifications: true,
+				certifications: true,
+				experience: true,
+				projects: true,
+				emergencyContactName: true,
+				emergencyContactPhone: true,
+				emergencyContactRelation: true,
 			},
 		});
 		if (!emp) return jsonError('Employee not found', 404);
@@ -124,6 +134,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 				name,
 				tenureDays,
 			},
+			profile: profileFromEmployee(emp as any),
 			insights,
 			summary: {
 				attendanceDays: attendance.length,

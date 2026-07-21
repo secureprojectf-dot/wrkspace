@@ -61,19 +61,6 @@ function initials(name: string) {
 	return `${p[0][0]}${p[p.length - 1][0]}`.toUpperCase();
 }
 
-function scoreTone(v: number) {
-	if (v >= 75) return 'good';
-	if (v >= 50) return 'mid';
-	return 'low';
-}
-
-function verdictFromScore(v: number) {
-	if (v >= 80) return { label: 'Strong profile', hint: 'Reliable history signals for company review.' };
-	if (v >= 65) return { label: 'Solid with notes', hint: 'Good baseline — check open flags below.' };
-	if (v >= 45) return { label: 'Needs review', hint: 'Mixed signals — dig into attendance & tasks.' };
-	return { label: 'High caution', hint: 'Limited or weak history — verify manually.' };
-}
-
 export function EmployeeVerificationApp() {
 	const [session, setSession] = useState<Session | null>(null);
 	const [ready, setReady] = useState(false);
@@ -271,7 +258,7 @@ export function EmployeeVerificationApp() {
 	const copySummary = async () => {
 		if (!dossier?.employee) return;
 		const e = dossier.employee;
-		const i = dossier.insights;
+		const p = dossier.profile || {};
 		const s = dossier.summary;
 		const text = [
 			`EMPLOYEE VERIFICATION — wrkspace`,
@@ -280,11 +267,14 @@ export function EmployeeVerificationApp() {
 			`Role: ${e.role} · Wing: ${e.wingName}`,
 			`Email: ${e.email} · Phone: ${e.phone}`,
 			`Tenure: ${e.tenureDays} days`,
-			`Overall score: ${i?.scores?.overall ?? '—'}`,
-			`Attendance days: ${s?.attendanceDays} · Tasks ${s?.tasksCompleted}/${s?.tasksTotal} · Submissions ${s?.submissionsTotal} · Leaves ${s?.leavesTotal}`,
-			`Strengths: ${(i?.strengths || []).join('; ')}`,
-			`Weaknesses: ${(i?.weaknesses || []).join('; ')}`,
-			`Flags: ${(i?.flags || []).join('; ') || 'none'}`,
+			`About: ${p.about || '—'}`,
+			`Remarks: ${p.remarks || '—'}`,
+			`EC: ${[p.emergencyContactName, p.emergencyContactPhone, p.emergencyContactRelation].filter(Boolean).join(' · ') || '—'}`,
+			`Qualifications: ${(p.qualifications || []).map((q: any) => q.degree).filter(Boolean).join('; ') || '—'}`,
+			`Certifications: ${(p.certifications || []).map((c: any) => c.name).filter(Boolean).join('; ') || '—'}`,
+			`Experience: ${(p.experience || []).map((x: any) => `${x.title}@${x.company}`).filter(Boolean).join('; ') || '—'}`,
+			`Projects: ${(p.projects || []).map((pr: any) => pr.name).filter(Boolean).join('; ') || '—'}`,
+			`Attendance days: ${s?.attendanceDays} · Tasks ${s?.tasksCompleted}/${s?.tasksTotal} · Submissions ${s?.submissionsTotal}`,
 			`Generated: ${new Date().toLocaleString()}`,
 		].join('\n');
 		await copyText(text, 'Summary copied');
@@ -333,23 +323,19 @@ export function EmployeeVerificationApp() {
 							<h2>Verification access</h2>
 							<p className="ev-sub">
 								Use your <strong>Admin panel</strong> email &amp; password — or a company login
-								shared by wrkspace.
+								shared by wrkspace. Same credentials as{' '}
+								<a href="/admin" style={{ color: '#8eb0ff' }}>
+									/admin
+								</a>
+								.
 							</p>
-
-							<LoginHintsBox
-								onPickEmail={(em) => {
-									setEmail(em);
-									setError('');
-								}}
-							/>
 
 							{error ? (
 								<div className="ev-alert ev-alert-error" role="alert">
 									<strong>{error}</strong>
 									{error.toLowerCase().includes('invalid') ? (
 										<span>
-											Employee portal logins do not work here. Use an admin account from the list
-											above.
+											Employee portal logins do not work here. Use an Admin panel account.
 										</span>
 									) : null}
 								</div>
@@ -364,7 +350,7 @@ export function EmployeeVerificationApp() {
 										autoComplete="username"
 										value={email}
 										onChange={(e) => setEmail(e.target.value)}
-										placeholder="Tap an email above, or type it"
+										placeholder="your admin email"
 									/>
 								</label>
 								<label className="ev-field">
@@ -410,10 +396,7 @@ export function EmployeeVerificationApp() {
 		);
 	}
 
-	const insights = dossier?.insights;
 	const emp = dossier?.employee;
-	const overall = Number(insights?.scores?.overall ?? 0);
-	const verdict = verdictFromScore(overall);
 
 	return (
 		<main className="ev-root ev-app">
@@ -675,8 +658,8 @@ export function EmployeeVerificationApp() {
 								<div className="ev-empty-art" aria-hidden />
 								<h2>Select an employee</h2>
 								<p>
-									Open a profile to review attendance, tasks, submissions, leaves, events, and
-									company-facing strengths / risks.
+									Open a profile to review about, qualifications, certifications, experience, and
+									workplace history.
 								</p>
 							</div>
 						) : (
@@ -724,12 +707,6 @@ export function EmployeeVerificationApp() {
 											</div>
 										</div>
 									</div>
-									<div className={`ev-score-card tone-${scoreTone(overall)}`}>
-										<p>Overall</p>
-										<strong>{insights?.scores?.overall ?? '—'}</strong>
-										<span>{verdict.label}</span>
-										<em>{verdict.hint}</em>
-									</div>
 								</div>
 
 								<div className="ev-toolbar print:hidden">
@@ -766,74 +743,174 @@ export function EmployeeVerificationApp() {
 
 								{dossierTab === 'overview' ? (
 									<div className="ev-overview">
-										<div className="ev-kpi-grid">
-											{[
-												['Attendance days', dossier.summary?.attendanceDays],
-												['Tasks done', `${dossier.summary?.tasksCompleted}/${dossier.summary?.tasksTotal}`],
-												['Submissions', dossier.summary?.submissionsTotal],
-												['Leaves', dossier.summary?.leavesTotal],
-												['Events', dossier.summary?.eventsAsRep],
-												['SOS count', dossier.summary?.sosCount],
-											].map(([label, val]) => (
-												<div key={String(label)} className="ev-kpi">
-													<span>{label}</span>
-													<strong>{val}</strong>
-												</div>
-											))}
-										</div>
+										{(() => {
+											const p = dossier.profile || {};
+											const quals = Array.isArray(p.qualifications) ? p.qualifications : [];
+											const certs = Array.isArray(p.certifications) ? p.certifications : [];
+											const exp = Array.isArray(p.experience) ? p.experience : [];
+											const projs = Array.isArray(p.projects) ? p.projects : [];
+											const hasEc =
+												p.emergencyContactName || p.emergencyContactPhone || p.emergencyContactRelation;
+											return (
+												<>
+													<div className="ev-card">
+														<h3>About</h3>
+														<p className="ev-prose">
+															{p.about?.trim()
+																? p.about
+																: 'No about section yet — employee can add this in Profile.'}
+														</p>
+													</div>
 
-										<div className="ev-insight-grid">
-											<div className="ev-card ev-card-tight">
-												<h3>Performance scores</h3>
-												<ScoreBar label="Attendance reliability" value={insights?.scores?.attendanceReliability ?? 0} />
-												<ScoreBar label="Task delivery" value={insights?.scores?.taskDelivery ?? 0} />
-												<ScoreBar label="Submission discipline" value={insights?.scores?.submissionDiscipline ?? 0} />
-											</div>
-											<div className="ev-card ev-card-tight ev-card-good">
-												<h3>Strengths</h3>
-												<ul>
-													{(insights?.strengths || []).map((s: string) => (
-														<li key={s}>{s}</li>
-													))}
-												</ul>
-											</div>
-											<div className="ev-card ev-card-tight ev-card-warn">
-												<h3>Weaknesses / watch</h3>
-												<ul>
-													{(insights?.weaknesses || []).map((s: string) => (
-														<li key={s}>{s}</li>
-													))}
-												</ul>
-												{(insights?.flags || []).length ? (
-													<ul className="ev-flags">
-														{insights.flags.map((s: string) => (
-															<li key={s}>{s}</li>
+													<div className="ev-card">
+														<h3>Remarks</h3>
+														<p className="ev-prose">
+															{p.remarks?.trim()
+																? p.remarks
+																: 'No remarks yet.'}
+														</p>
+													</div>
+
+													<div className="ev-card">
+														<h3>Emergency contact (EC)</h3>
+														{hasEc ? (
+															<ul className="ev-notes">
+																<li>
+																	<strong>{p.emergencyContactName || '—'}</strong>
+																	{p.emergencyContactRelation
+																		? ` · ${p.emergencyContactRelation}`
+																		: ''}
+																</li>
+																<li className="ev-mono">{p.emergencyContactPhone || '—'}</li>
+															</ul>
+														) : (
+															<p className="ev-muted">Not provided.</p>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Qualifications</h3>
+														{quals.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{quals.map((q: any) => (
+																	<li key={q.id || q.degree}>
+																		<strong>{q.degree}</strong>
+																		{q.institution ? ` — ${q.institution}` : ''}
+																		{q.year ? ` (${q.year})` : ''}
+																		{q.details ? (
+																			<span className="ev-muted"> · {q.details}</span>
+																		) : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Certifications</h3>
+														{certs.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{certs.map((c: any) => (
+																	<li key={c.id || c.name}>
+																		<strong>{c.name}</strong>
+																		{c.issuer ? ` — ${c.issuer}` : ''}
+																		{c.year ? ` (${c.year})` : ''}
+																		{c.credentialUrl ? (
+																			<>
+																				{' · '}
+																				<a href={c.credentialUrl} target="_blank" rel="noreferrer">
+																					Credential
+																				</a>
+																			</>
+																		) : null}
+																		{c.fileUrl ? (
+																			<>
+																				{' · '}
+																				<a href={c.fileUrl} target="_blank" rel="noreferrer">
+																					View file
+																				</a>
+																			</>
+																		) : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Experience</h3>
+														{exp.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{exp.map((x: any) => (
+																	<li key={x.id || `${x.title}-${x.company}`}>
+																		<strong>{x.title}</strong>
+																		{x.company ? ` @ ${x.company}` : ''}
+																		<span className="ev-muted">
+																			{' '}
+																			· {x.from || '?'} – {x.current ? 'Present' : x.to || '?'}
+																		</span>
+																		{x.description ? (
+																			<div className="ev-muted">{x.description}</div>
+																		) : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Projects</h3>
+														{projs.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{projs.map((pr: any) => (
+																	<li key={pr.id || pr.name}>
+																		<strong>{pr.name}</strong>
+																		{pr.role ? ` · ${pr.role}` : ''}
+																		{pr.year ? ` (${pr.year})` : ''}
+																		{pr.tech ? (
+																			<span className="ev-muted"> · {pr.tech}</span>
+																		) : null}
+																		{pr.url ? (
+																			<>
+																				{' · '}
+																				<a href={pr.url} target="_blank" rel="noreferrer">
+																					Link
+																				</a>
+																			</>
+																		) : null}
+																		{pr.description ? (
+																			<div className="ev-muted">{pr.description}</div>
+																		) : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-kpi-grid">
+														{[
+															['Attendance days', dossier.summary?.attendanceDays],
+															['Tasks done', `${dossier.summary?.tasksCompleted}/${dossier.summary?.tasksTotal}`],
+															['Submissions', dossier.summary?.submissionsTotal],
+															['Leaves', dossier.summary?.leavesTotal],
+														].map(([label, val]) => (
+															<div key={String(label)} className="ev-kpi">
+																<span>{label}</span>
+																<strong>{val}</strong>
+															</div>
 														))}
-													</ul>
-												) : null}
-											</div>
-										</div>
-
-										{(insights?.priorityNotes || []).length ? (
-											<div className="ev-card">
-												<h3>Priority notes (company view)</h3>
-												<ul className="ev-notes">
-													{insights.priorityNotes.map((s: string) => (
-														<li key={s}>{s}</li>
-													))}
-												</ul>
-											</div>
-										) : null}
-
-										<div className="ev-card print:hidden">
-											<h3>Quick history peek</h3>
-											<p className="ev-muted">Open tabs above for full tables.</p>
-											<ul className="ev-peek">
-												<li>Latest attendance: {peek(dossier.attendance, (a) => `${a.date} · ${a.checkIn || '—'} → ${a.checkOut || '—'}`)}</li>
-												<li>Latest task: {peek(dossier.tasks, (t) => `${t.title} (${t.status})`)}</li>
-												<li>Latest submission: {peek(dossier.submissions, (s) => `${s.title} (${s.status})`)}</li>
-											</ul>
-										</div>
+													</div>
+												</>
+											);
+										})()}
 									</div>
 								) : null}
 
@@ -900,26 +977,6 @@ export function EmployeeVerificationApp() {
 	);
 }
 
-function peek(rows: any[], render: (r: any) => string) {
-	if (!Array.isArray(rows) || !rows.length) return '—';
-	return render(rows[0]);
-}
-
-function ScoreBar({ label, value }: { label: string; value: number }) {
-	const tone = scoreTone(value);
-	return (
-		<div className="ev-scorebar">
-			<div className="ev-scorebar-label">
-				<span>{label}</span>
-				<span>{value}</span>
-			</div>
-			<div className="ev-scorebar-track">
-				<div className={`ev-scorebar-fill tone-${tone}`} style={{ width: `${Math.max(4, value)}%` }} />
-			</div>
-		</div>
-	);
-}
-
 function HistoryTable({
 	title,
 	rows,
@@ -961,59 +1018,6 @@ function HistoryTable({
 						</tbody>
 					</table>
 				</div>
-			)}
-		</div>
-	);
-}
-
-function LoginHintsBox({ onPickEmail }: { onPickEmail: (email: string) => void }) {
-	const [hints, setHints] = useState<{
-		workspaceAdmins: { email: string; org: string }[];
-		companyLogins: { email: string; role: string; company: string | null }[];
-	} | null>(null);
-
-	useEffect(() => {
-		void fetch('/api/verification/login-hints', { cache: 'no-store' })
-			.then((r) => r.json())
-			.then((data) => {
-				if (data?.workspaceAdmins) setHints(data);
-			})
-			.catch(() => {});
-	}, []);
-
-	return (
-		<div className="ev-hints">
-			<p className="ev-hints-title">Allowed accounts (tap email to fill)</p>
-			{hints ? (
-				<>
-					<div className="ev-hints-group">
-						<span>Workspace admins</span>
-						{hints.workspaceAdmins.length === 0 ? (
-							<p className="ev-muted">None found</p>
-						) : (
-							hints.workspaceAdmins.map((a) => (
-								<button key={a.email} type="button" className="ev-hint-email" onClick={() => onPickEmail(a.email)}>
-									{a.email}
-									<em>{a.org}</em>
-								</button>
-							))
-						)}
-					</div>
-					{hints.companyLogins.length > 0 ? (
-						<div className="ev-hints-group">
-							<span>Company logins</span>
-							{hints.companyLogins.map((u) => (
-								<button key={u.email} type="button" className="ev-hint-email is-company" onClick={() => onPickEmail(u.email)}>
-									{u.email}
-									<em>{u.company || u.role}</em>
-								</button>
-							))}
-						</div>
-					) : null}
-					<p className="ev-hints-foot">Password = the one used on Admin panel (/admin).</p>
-				</>
-			) : (
-				<p className="ev-muted">Loading allowed emails…</p>
 			)}
 		</div>
 	);

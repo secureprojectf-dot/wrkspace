@@ -56,6 +56,22 @@ model Employee {
   photoUrl     String?
   /// Admin-uploaded employee ID card image (data URL or https)
   idCardUrl    String?
+  /// Company-facing bio / about
+  about        String?  @db.Text
+  /// Employee notes / remarks for verification companies
+  remarks      String?  @db.Text
+  /// JSON array: qualifications
+  qualifications String? @db.Text
+  /// JSON array: certifications (optional fileUrl)
+  certifications String? @db.Text
+  /// JSON array: work experience
+  experience   String?  @db.Text
+  /// JSON array: projects
+  projects     String?  @db.Text
+  /// Emergency contact (EC)
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
   /// Last known device location (continuous while app monitors / on shift)
   lastLat      Float?
   lastLng      Float?

@@ -503,6 +503,33 @@ export async function updateEmployeePhoto(employeeId: string, photoUrl: string |
   }
 }
 
+/** Employee self-service: about, remarks, quals, certs, experience, projects, EC. */
+export async function updateEmployeeProfessionalProfile(
+  employeeId: string,
+  payload: Record<string, unknown>
+) {
+  try {
+    const id = String(employeeId || '').trim();
+    if (!id) return { success: false as const, error: 'Employee id required' };
+    const { sanitizeProfessionalProfile, profileFromEmployee } = await import(
+      '@/lib/employee-professional-profile'
+    );
+    const data = sanitizeProfessionalProfile(payload as any);
+    const employee = await db.employee.update({
+      where: { id },
+      data,
+    });
+    return {
+      success: true as const,
+      employee,
+      profile: profileFromEmployee(employee as any),
+    };
+  } catch (error: any) {
+    console.error('updateEmployeeProfessionalProfile', error);
+    return { success: false as const, error: error.message || 'Failed to save profile' };
+  }
+}
+
 export async function setEmployeeGender(employeeId: string, gender: string) {
   try {
     const g = String(gender || '').trim().toUpperCase();

@@ -38,6 +38,7 @@ import {
 } from '@/app/admin/actions';
 import { MessagesView } from './messages-view';
 import { EmployeeSafetyPanel } from './safety-panel';
+import { EmployeeProfessionalProfileEditor } from './employee-professional-profile';
 import { ProfilePhotoEditor } from './profile-photo';
 
 type EmpTabType = 'overview' | 'tasks' | 'attendance' | 'leaves' | 'messages' | 'events' | 'work_submission' | 'leads' | 'hr_companies' | 'profile' | 'id_card' | 'safety';
@@ -2149,6 +2150,14 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 										</div>
 									</div>
 								</div>
+							</div>
+
+							<div className="border-t border-zinc-800 pt-8">
+								<EmployeeProfessionalProfileEditor
+									employee={employee}
+									onEmployeeUpdate={onEmployeeUpdate}
+									compact={Boolean(mobilePanelTab)}
+								/>
 							</div>
 						</div>
 					</div>
