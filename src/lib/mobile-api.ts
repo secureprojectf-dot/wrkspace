@@ -39,6 +39,32 @@ export async function apiPost<T = any>(path: string, body: Record<string, unknow
 	return data as T;
 }
 
+export async function apiPatch<T = any>(path: string, body: Record<string, unknown> = {}): Promise<T> {
+	const token = employeeToken();
+	const res = await fetch(path, {
+		method: 'PATCH',
+		headers: {
+			'Content-Type': 'application/json',
+			...(token ? { Authorization: `Bearer ${token}` } : {}),
+		},
+		body: JSON.stringify(body),
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) throw new Error((data as any).error || `Request failed (${res.status})`);
+	return data as T;
+}
+
+export async function apiDelete<T = any>(path: string): Promise<T> {
+	const token = employeeToken();
+	const res = await fetch(path, {
+		method: 'DELETE',
+		headers: token ? { Authorization: `Bearer ${token}` } : {},
+	});
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok) throw new Error((data as any).error || `Request failed (${res.status})`);
+	return data as T;
+}
+
 export function getPosition(timeoutMs = 20000): Promise<GeolocationPosition> {
 	return new Promise((resolve, reject) => {
 		if (!navigator.geolocation) {
