@@ -215,4 +215,49 @@ export function useMobileTracking({ employee, enabled, onLeaveOffice, onLocation
 			if (homeTimer) window.clearInterval(homeTimer);
 		};
 	}, [employee, enabled, onLeaveOffice, onLocationError]);
+
+	/** Admin Live Tracking — post GPS while global/personal track is ON (even off-shift). */
+	useEffect(() => {
+		if (!employee?.id) return;
+
+		let alive = true;
+		let shouldTrack = false;
+		let statusTimer: number | undefined;
+		let beatTimer: number | undefined;
+
+		const heartbeat = async () => {
+			if (!alive || !shouldTrack) return;
+			try {
+				const pos = await getPosition(12000);
+				errorNotified.current = false;
+				await apiPost('/api/attendance/location', {
+					lat: pos.coords.latitude,
+					lng: pos.coords.longitude,
+				});
+			} catch {
+				/* permission denied or timeout — admin map simply won't see this phone */
+			}
+		};
+
+		const refreshFlag = async () => {
+			if (!alive) return;
+			try {
+				const st = await apiGet<{ shouldTrack?: boolean }>('/api/attendance/live-track-status');
+				shouldTrack = Boolean(st.shouldTrack);
+				if (shouldTrack) void heartbeat();
+			} catch {
+				/* ignore */
+			}
+		};
+
+		void refreshFlag();
+		statusTimer = window.setInterval(() => void refreshFlag(), 30_000);
+		beatTimer = window.setInterval(() => void heartbeat(), 15_000);
+
+		return () => {
+			alive = false;
+			if (statusTimer) window.clearInterval(statusTimer);
+			if (beatTimer) window.clearInterval(beatTimer);
+		};
+	}, [employee?.id]);
 }

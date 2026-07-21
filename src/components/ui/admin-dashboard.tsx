@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, updateEmployeeIdCard, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents, getHrCompanies, createHrCompany, updateHrCompany, deleteHrCompany, triggerHrCompaniesCrawl, allowHrCompany, allowAllHrCompanies, deleteAllCrawledHrCompanies, bulkImportEmployees, getTeamLeads, allocateTeamLead, updateTeamLead, deleteTeamLead, getEmployeeByEmail, allowEmployeeHomeSetup } from '@/app/admin/actions';
 import { AdminLiveSafetyPanel } from './safety-panel';
+import { AdminLiveTrackingPanel } from './live-tracking-panel';
 import OfficesPanel from '@/components/ui/offices-panel';
 import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon, PencilIcon, CheckIcon, XIcon, EyeIcon, CopyIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -30,7 +31,7 @@ interface AdminDashboardProps {
 	onLogout: () => void;
 }
 
-type TabType = 'overview' | 'employees' | 'leaves' | 'attendance' | 'offices' | 'clients' | 'system_status' | 'messages' | 'task_allocation' | 'events' | 'work_submissions' | 'leads' | 'hr_companies' | 'super_admin' | 'team_leads' | 'live_safety';
+type TabType = 'overview' | 'employees' | 'leaves' | 'attendance' | 'offices' | 'clients' | 'system_status' | 'messages' | 'task_allocation' | 'events' | 'work_submissions' | 'leads' | 'hr_companies' | 'super_admin' | 'team_leads' | 'live_safety' | 'live_tracking';
 
 export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -1501,6 +1502,12 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 					>
 						Live safety
 					</button>
+					<button
+						onClick={() => setActiveTab('live_tracking')}
+						className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'live_tracking' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
+					>
+						Live tracking
+					</button>
 					{(isSuperAdmin || allowedTabs.includes('employees')) && (
 						<button
 							onClick={() => setActiveTab('employees')}
@@ -1630,6 +1637,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 
 				{/* Tab content: Overview */}
 				{activeTab === 'live_safety' && <AdminLiveSafetyPanel adminEmail={email} />}
+				{activeTab === 'live_tracking' && <AdminLiveTrackingPanel adminEmail={email} />}
 
 				{activeTab === 'overview' && (
 					<div className="space-y-6">
