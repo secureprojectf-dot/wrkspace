@@ -1,20 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 /** Phone / narrow tablet — Flutter-style shell. Desktop keeps employee website. */
 const MOBILE_MQ = '(max-width: 767px)';
 
-export function useIsMobile(defaultValue = false) {
-	const [isMobile, setIsMobile] = useState(defaultValue);
+function readIsMobile(): boolean {
+	if (typeof window === 'undefined') return false;
+	try {
+		return window.matchMedia(MOBILE_MQ).matches;
+	} catch {
+		return false;
+	}
+}
 
-	useEffect(() => {
-		const mq = window.matchMedia(MOBILE_MQ);
-		const apply = () => setIsMobile(mq.matches);
-		apply();
-		mq.addEventListener('change', apply);
-		return () => mq.removeEventListener('change', apply);
-	}, []);
-
+/**
+ * Latch mobile vs desktop once on first client render.
+ * Do NOT flip on resize — remounting MobileAppShell ↔ EmployeeDashboard
+ * was contributing to Android Chrome "page couldn't load" crashes.
+ */
+export function useIsMobile() {
+	const [isMobile] = useState(readIsMobile);
 	return isMobile;
 }

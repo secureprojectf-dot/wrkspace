@@ -41,6 +41,7 @@ function EmployeeShell({
 	onLogout: () => void;
 	onEmployeeUpdate: (next: any) => void;
 }) {
+	// Latched once — never remount between mobile/desktop mid-session.
 	const isMobile = useIsMobile();
 	if (isMobile) {
 		return (

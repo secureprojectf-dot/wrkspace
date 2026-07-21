@@ -32,7 +32,7 @@ self.addEventListener('notificationclick', (event) => {
 		headers: {
 			'Content-Type': 'application/javascript; charset=utf-8',
 			'Cache-Control': 'no-store',
-			'Service-Worker-Allowed': '/',
+			// Do NOT set Service-Worker-Allowed: / — root scope breaks Android Chrome navigations.
 		},
 	});
 }

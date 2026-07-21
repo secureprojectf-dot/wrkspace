@@ -54,9 +54,9 @@ const PANEL_TITLES: Record<string, string> = {
 const SAFETY_KEYS = new Set(['safety', 'sos', 'home_pin', 'trips']);
 
 /**
- * Mobile shell with an in-app back trap.
- * Never call history.back() / about:blank — those unload the SPA on Android Chrome
- * and show "This page couldn't load".
+ * Mobile shell — pure React navigation (no History API).
+ * pushState/popstate was unloading the document on Android Chrome
+ * ("This page couldn't load").
  */
 export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) {
 	const [section, setSection] = useState<Section>('home');
@@ -68,32 +68,37 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	const [installHint, setInstallHint] = useState(false);
 	const [messagesChatOpen, setMessagesChatOpen] = useState(false);
 	const [closeChatSignal, setCloseChatSignal] = useState(0);
-	const [exitToast, setExitToast] = useState(false);
 	const [locStatus, setLocStatus] = useState<'ok' | 'denied' | 'prompt' | 'unsupported'>('prompt');
 	const [locBannerDismissed, setLocBannerDismissed] = useState(false);
-	const lastBackAt = useRef<number>(0);
-	const panelStackRef = useRef<string[]>([]);
-	const sectionRef = useRef<Section>('home');
-	const chatOpenRef = useRef(false);
-	const scannerRef = useRef(false);
-
-	panelStackRef.current = panelStack;
-	sectionRef.current = section;
-	chatOpenRef.current = messagesChatOpen;
-	scannerRef.current = scannerOpen;
+	const pushStarted = useRef(false);
 
 	const panel = panelStack[panelStack.length - 1] ?? null;
 
 	useEffect(() => {
 		document.documentElement.classList.remove('dark');
 		document.documentElement.classList.add('light');
-		void registerWebPush(employee?.id);
 		const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
 		const standalone =
 			(window.navigator as any).standalone === true ||
 			window.matchMedia('(display-mode: standalone)').matches;
 		if (ios && !standalone) setInstallHint(true);
-		void ensureLocationPermission().then(setLocStatus);
+
+		// Location after first paint — never block UI
+		const tLoc = window.setTimeout(() => {
+			void ensureLocationPermission().then(setLocStatus);
+		}, 800);
+
+		// Push much later so SW registration cannot race first taps
+		const tPush = window.setTimeout(() => {
+			if (pushStarted.current) return;
+			pushStarted.current = true;
+			void registerWebPush(employee?.id);
+		}, 4000);
+
+		return () => {
+			window.clearTimeout(tLoc);
+			window.clearTimeout(tPush);
+		};
 	}, [employee?.id]);
 
 	const onLeaveOffice = useCallback(() => setLeaveOpen(true), []);
@@ -116,65 +121,13 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 		setPanelStack((s) => s.slice(0, -1));
 	}, []);
 
-	const tryExitApp = useCallback(() => {
-		const now = Date.now();
-		if (lastBackAt.current && now - lastBackAt.current < 2000) {
-			lastBackAt.current = 0;
-			setExitToast(false);
-			// Stay on the SPA — never navigate to about:blank (breaks Android Chrome).
-			try {
-				window.close();
-			} catch {
-				/* browsers block this unless opened by script */
-			}
-			return;
-		}
-		lastBackAt.current = now;
-		setExitToast(true);
-		window.setTimeout(() => setExitToast(false), 2000);
+	const goHome = useCallback(() => {
+		setMessagesChatOpen(false);
+		setCloseChatSignal((n) => n + 1);
+		setPanelStack([]);
+		setScannerOpen(false);
+		setSection('home');
 	}, []);
-
-	/** Handle Android/iOS browser back without leaving the document. */
-	const handleSystemBack = useCallback(() => {
-		if (scannerRef.current) {
-			setScannerOpen(false);
-			return;
-		}
-		if (panelStackRef.current.length > 0) {
-			popPanel();
-			return;
-		}
-		if (sectionRef.current === 'messages' && chatOpenRef.current) {
-			setCloseChatSignal((n) => n + 1);
-			return;
-		}
-		if (sectionRef.current !== 'home') {
-			setSection('home');
-			setMessagesChatOpen(false);
-			return;
-		}
-		tryExitApp();
-	}, [popPanel, tryExitApp]);
-
-	useEffect(() => {
-		const trap = () => {
-			try {
-				window.history.pushState({ wrkspaceTrap: 1 }, '', window.location.href);
-			} catch {
-				/* ignore */
-			}
-		};
-		// Seed one trap entry so the first hardware Back stays inside the app.
-		trap();
-
-		const onPop = () => {
-			handleSystemBack();
-			// Re-arm immediately so history never walks off the SPA document.
-			trap();
-		};
-		window.addEventListener('popstate', onPop);
-		return () => window.removeEventListener('popstate', onPop);
-	}, [handleSystemBack]);
 
 	const handleLeaveChoice = async (mode: 'office_work' | 'going_home') => {
 		if (leaveBusy) return;
@@ -255,12 +208,6 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 				</div>
 			) : null}
 
-			{exitToast ? (
-				<div className="pointer-events-none absolute bottom-28 left-1/2 z-[100] -translate-x-1/2 rounded-full bg-[#0F172A] px-4 py-2 text-xs font-semibold text-white shadow-lg">
-					Press back again to close the app
-				</div>
-			) : null}
-
 			<div className="relative min-h-0 flex-1">
 				<div className={section === 'home' ? 'h-full' : 'hidden'}>
 					<MobileHomeTab
@@ -295,17 +242,24 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 			<CorpBottomNav
 				section={section}
 				hidden={hideNav}
-				onHome={() => {
-					setMessagesChatOpen(false);
-					setSection('home');
-				}}
+				onHome={goHome}
 				onTasks={() => {
 					setMessagesChatOpen(false);
+					setCloseChatSignal((n) => n + 1);
+					setPanelStack([]);
+					setScannerOpen(false);
 					setSection('tasks');
 				}}
-				onMessages={() => setSection('messages')}
+				onMessages={() => {
+					setPanelStack([]);
+					setScannerOpen(false);
+					setSection('messages');
+				}}
 				onMore={() => {
 					setMessagesChatOpen(false);
+					setCloseChatSignal((n) => n + 1);
+					setPanelStack([]);
+					setScannerOpen(false);
 					setSection('more');
 				}}
 				onScanner={() => setScannerOpen(true)}

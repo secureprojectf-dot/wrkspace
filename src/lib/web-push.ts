@@ -5,7 +5,11 @@ import { getApps, getApp, initializeApp } from 'firebase/app';
 import { employeeToken } from '@/lib/mobile-api';
 import { getFirebasePublicConfig } from '@/lib/firebase-public-config';
 
-/** Register FCM web push when supported (Chrome/Android PWA; iOS 16.4+ installed PWA). */
+/**
+ * Register FCM web push when supported.
+ * Avoid root-scoped SWs with Service-Worker-Allowed — those can break
+ * Android Chrome document loads when claiming the whole origin.
+ */
 export async function registerWebPush(_employeeId?: string) {
 	if (typeof window === 'undefined') return;
 	try {
@@ -15,19 +19,42 @@ export async function registerWebPush(_employeeId?: string) {
 		const ok = await isSupported();
 		if (!ok) return;
 
+		// Drop broken root-scope placeholder SWs (no fetch handler + clients.claim)
+		if ('serviceWorker' in navigator) {
+			const regs = await navigator.serviceWorker.getRegistrations();
+			await Promise.all(
+				regs.map(async (reg) => {
+					const script = reg.active?.scriptURL || reg.installing?.scriptURL || '';
+					const isPlaceholder =
+						script.includes('/firebase-messaging-sw.js') &&
+						!script.includes('/api/firebase-messaging-sw');
+					const isRootScope = reg.scope === `${window.location.origin}/`;
+					if (isPlaceholder || (isRootScope && script.includes('firebase-messaging-sw'))) {
+						try {
+							await reg.unregister();
+						} catch {
+							/* ignore */
+						}
+					}
+				}),
+			);
+		}
+
 		const permission = await Notification.requestPermission();
 		if (permission !== 'granted') return;
 
-		if ('serviceWorker' in navigator) {
-			await navigator.serviceWorker.register('/api/firebase-messaging-sw');
-		}
+		// Scope under /api/ only — do not claim the whole site
+		const registration = await navigator.serviceWorker.register('/api/firebase-messaging-sw', {
+			scope: '/api/firebase-messaging-sw/',
+			updateViaCache: 'none',
+		});
 
 		const app = getApps().length ? getApp() : initializeApp(config);
 		const messaging = getMessaging(app);
 		const vapid = (process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '').trim();
 		const token = await getToken(messaging, {
 			vapidKey: vapid || undefined,
-			serviceWorkerRegistration: await navigator.serviceWorker.ready,
+			serviceWorkerRegistration: registration,
 		}).catch(() => null);
 		if (!token) return;
 
@@ -41,6 +68,6 @@ export async function registerWebPush(_employeeId?: string) {
 			body: JSON.stringify({ token, platform: 'web' }),
 		});
 	} catch {
-		/* push optional */
+		/* push optional — never break the app shell */
 	}
 }

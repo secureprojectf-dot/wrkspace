@@ -1,5 +1,8 @@
-/* Placeholder — real SW is served from /api/firebase-messaging-sw (env-injected). */
-self.addEventListener('install', () => self.skipWaiting());
+/* Messaging SW placeholder — do not claim the whole origin. */
+self.addEventListener('install', (event) => {
+	event.waitUntil(self.skipWaiting());
+});
 self.addEventListener('activate', (event) => {
-	event.waitUntil(self.clients.claim());
+	// Intentionally no clients.claim() — claiming / crashes Android Chrome page loads.
+	event.waitUntil(Promise.resolve());
 });
