@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './button';
-import { EmployeeDashboard } from './employee-dashboard';
-import { MobileAppShell } from '@/components/mobile/mobile-app-shell';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { purgeBrokenServiceWorkers } from '@/lib/purge-sw';
 
 import {
 	AtSignIcon,
@@ -32,6 +32,24 @@ import { firebaseAuth, googleProvider } from '@/lib/firebase-client';
 import { signInWithPopup } from 'firebase/auth';
 import { GoogleSignInButton } from './google-sign-in-button';
 
+const MobileAppShell = dynamic(
+	() => import('@/components/mobile/mobile-app-shell').then((m) => m.MobileAppShell),
+	{ ssr: false, loading: () => <ShellLoading /> },
+);
+
+const EmployeeDashboard = dynamic(
+	() => import('./employee-dashboard').then((m) => m.EmployeeDashboard),
+	{ ssr: false, loading: () => <ShellLoading /> },
+);
+
+function ShellLoading() {
+	return (
+		<div className="flex min-h-screen items-center justify-center bg-[#F0F3FF] text-[#0F172A]">
+			<div className="size-8 animate-spin rounded-full border-2 border-[#0047FF] border-t-transparent" />
+		</div>
+	);
+}
+
 function EmployeeShell({
 	employee,
 	onLogout,
@@ -41,23 +59,33 @@ function EmployeeShell({
 	onLogout: () => void;
 	onEmployeeUpdate: (next: any) => void;
 }) {
-	// Latched once — never remount between mobile/desktop mid-session.
 	const isMobile = useIsMobile();
+
+	useEffect(() => {
+		void purgeBrokenServiceWorkers();
+	}, []);
+
+	if (isMobile === null) return <ShellLoading />;
+
 	if (isMobile) {
 		return (
-			<MobileAppShell
+			<Suspense fallback={<ShellLoading />}>
+				<MobileAppShell
+					employee={employee}
+					onLogout={onLogout}
+					onEmployeeUpdate={onEmployeeUpdate}
+				/>
+			</Suspense>
+		);
+	}
+	return (
+		<Suspense fallback={<ShellLoading />}>
+			<EmployeeDashboard
 				employee={employee}
 				onLogout={onLogout}
 				onEmployeeUpdate={onEmployeeUpdate}
 			/>
-		);
-	}
-	return (
-		<EmployeeDashboard
-			employee={employee}
-			onLogout={onLogout}
-			onEmployeeUpdate={onEmployeeUpdate}
-		/>
+		</Suspense>
 	);
 }
 

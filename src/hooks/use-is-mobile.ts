@@ -1,25 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-/** Phone / narrow tablet — Flutter-style shell. Desktop keeps employee website. */
 const MOBILE_MQ = '(max-width: 767px)';
 
-function readIsMobile(): boolean {
-	if (typeof window === 'undefined') return false;
-	try {
-		return window.matchMedia(MOBILE_MQ).matches;
-	} catch {
-		return false;
-	}
-}
-
 /**
- * Latch mobile vs desktop once on first client render.
- * Do NOT flip on resize — remounting MobileAppShell ↔ EmployeeDashboard
- * was contributing to Android Chrome "page couldn't load" crashes.
+ * Wait until after mount so SSR/hydration never mismatch.
+ * Latch the value once — do not flip mid-session.
  */
 export function useIsMobile() {
-	const [isMobile] = useState(readIsMobile);
+	const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+	useEffect(() => {
+		try {
+			setIsMobile(window.matchMedia(MOBILE_MQ).matches);
+		} catch {
+			setIsMobile(false);
+		}
+	}, []);
+
 	return isMobile;
 }

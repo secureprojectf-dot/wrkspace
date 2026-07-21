@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { CorpBottomNav } from './corp-bottom-nav';
 import { MobileHomeTab } from './tabs/home-tab';
 import { MobileTasksTab } from './tabs/tasks-tab';
@@ -17,12 +18,17 @@ import { MobileSafetyHub } from './safety/safety-hub';
 import { MobileEmergencySos } from './safety/emergency-sos';
 import { MobileHomePin } from './safety/home-pin';
 import { MobileTripHistory } from './safety/trip-history';
-import { EmployeeDashboard } from '@/components/ui/employee-dashboard';
 import { keepCheckedIn, clockOut, startGoingHomeTrip } from '@/app/admin/actions';
 import { ensureLocationPermission, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
-import { registerWebPush, subscribeOfficeExitPush } from '@/lib/web-push';
+import { registerWebPush } from '@/lib/web-push';
+import { purgeBrokenServiceWorkers } from '@/lib/purge-sw';
 
 const AUTO_CHECKOUT_MS = 5 * 60 * 1000;
+
+const EmployeeDashboard = dynamic(
+	() => import('@/components/ui/employee-dashboard').then((m) => m.EmployeeDashboard),
+	{ ssr: false },
+);
 
 type Section = 'home' | 'tasks' | 'messages' | 'more';
 
@@ -101,6 +107,8 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 	useEffect(() => {
 		document.documentElement.classList.remove('dark');
 		document.documentElement.classList.add('light');
+		void purgeBrokenServiceWorkers();
+
 		const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
 		const standalone =
 			(window.navigator as any).standalone === true ||
@@ -109,36 +117,35 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 
 		const tLoc = window.setTimeout(() => {
 			void ensureLocationPermission().then(setLocStatus);
-		}, 800);
+		}, 2000);
 
 		const tPush = window.setTimeout(() => {
 			if (pushStarted.current) return;
 			pushStarted.current = true;
-			void registerWebPush(employee?.id).then(() => {
-				void subscribeOfficeExitPush(() => openLeaveDialog());
-			});
-		}, 2500);
+			void registerWebPush(employee?.id);
+		}, 8000);
 
-		// Restore pending leave choice (notification tap / prior session)
-		const params = new URLSearchParams(window.location.search);
-		if (params.get('office_exit') === '1' || readOfficeExitPending()) {
-			openLeaveDialog();
-			if (params.get('office_exit') === '1') {
-				params.delete('office_exit');
-				const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
-				window.history.replaceState(null, '', next);
+		// Restore pending leave choice after a beat (don't block first paint)
+		const tLeave = window.setTimeout(() => {
+			try {
+				const params = new URLSearchParams(window.location.search);
+				if (params.get('office_exit') === '1' || readOfficeExitPending()) {
+					openLeaveDialog();
+					if (params.get('office_exit') === '1') {
+						params.delete('office_exit');
+						const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}${window.location.hash}`;
+						window.history.replaceState(null, '', next);
+					}
+				}
+			} catch {
+				/* ignore */
 			}
-		}
-
-		const onMsg = (ev: MessageEvent) => {
-			if (ev.data?.type === 'office_exit') openLeaveDialog();
-		};
-		navigator.serviceWorker?.addEventListener('message', onMsg);
+		}, 500);
 
 		return () => {
 			window.clearTimeout(tLoc);
 			window.clearTimeout(tPush);
-			navigator.serviceWorker?.removeEventListener('message', onMsg);
+			window.clearTimeout(tLeave);
 			clearLeaveTimers();
 		};
 	}, [employee?.id, openLeaveDialog, clearLeaveTimers]);
@@ -381,13 +388,21 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 						{panel === 'trips' ? <MobileTripHistory employee={employee} /> : null}
 						{workTab ? (
 							<div className="emp-mobile-panel h-full">
-								<EmployeeDashboard
-									employee={employee}
-									onLogout={onLogout}
-									onEmployeeUpdate={onEmployeeUpdate}
-									mobilePanelTab={workTab as any}
-									mobileLogsOnly={workTab === 'attendance'}
-								/>
+								<Suspense
+									fallback={
+										<div className="flex justify-center py-16">
+											<div className="size-6 animate-spin rounded-full border-2 border-[#0047FF] border-t-transparent" />
+										</div>
+									}
+								>
+									<EmployeeDashboard
+										employee={employee}
+										onLogout={onLogout}
+										onEmployeeUpdate={onEmployeeUpdate}
+										mobilePanelTab={workTab as any}
+										mobileLogsOnly={workTab === 'attendance'}
+									/>
+								</Suspense>
 							</div>
 						) : null}
 					</div>
