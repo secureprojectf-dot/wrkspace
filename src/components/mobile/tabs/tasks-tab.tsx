@@ -55,7 +55,7 @@ export function MobileTasksTab({ employee }: Props) {
 
 	return (
 		<div className="flex h-full min-h-0 flex-col bg-[#F0F3FF]">
-			<div className="shrink-0 border-b border-[#E2E8F0] bg-white px-4 pb-4 pt-[max(16px,env(safe-area-inset-top))]">
+			<div className="shrink-0 border-b border-[#E2E8F0] bg-white px-4 pb-4 pt-4">
 				<div className="flex items-center gap-3">
 					<div className="flex size-11 items-center justify-center rounded-xl bg-[#E8EFFF] text-[#0047FF]">
 						<ListTodo className="size-5" />

@@ -405,7 +405,7 @@ export function MobileMessagesTab({ employee, onChatOpenChange, closeChatSignal 
 	const threadIds = new Set(threads.map((t) => t.peerId));
 
 	return (
-		<div className="flex h-full min-h-0 flex-col bg-[#F0F3FF] pt-[env(safe-area-inset-top)]">
+		<div className="flex h-full min-h-0 flex-col bg-[#F0F3FF]">
 			<input
 				ref={fileRef}
 				type="file"

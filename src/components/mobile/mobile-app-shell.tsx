@@ -430,7 +430,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 
 			{panelOpen && panel ? (
 				<div className="fixed inset-0 z-[70] flex flex-col bg-[#F0F3FF]">
-					<div className="flex items-center gap-2 border-b border-[#E2E8F0] bg-white px-2 py-2.5 pt-[max(10px,env(safe-area-inset-top))]">
+					<div className="flex items-center gap-2 border-b border-[#E2E8F0] bg-white px-2 py-2.5">
 						<button
 							type="button"
 							onClick={popPanel}

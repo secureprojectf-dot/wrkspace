@@ -143,7 +143,7 @@ export function MobileScannerScreen({ onClose }: Props) {
 
 	return (
 		<div className="fixed inset-0 z-[80] flex flex-col bg-[#0F172A] text-white">
-			<div className="flex items-center gap-3 px-3 pb-2 pt-[max(12px,env(safe-area-inset-top))]">
+			<div className="flex items-center gap-3 px-3 pb-2 pt-3">
 				<button
 					type="button"
 					onClick={() => onClose(false)}
