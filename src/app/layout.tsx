@@ -17,8 +17,24 @@ export const metadata: Metadata = {
   description: "A firm of software and IT wing",
   authors: [{ name: "redlix pro wing", url: "https://www.redlix.co.in" }],
   publisher: "www.podtem.co.in",
+  applicationName: "wrkspace",
+  appleWebApp: {
+    capable: true,
+    title: "wrkspace",
+    statusBarStyle: "default",
+  },
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "https://ik.imagekit.io/dypkhqxip/faviconw",
+    icon: [
+      { url: "/branding/favicon.ico", sizes: "48x48" },
+      { url: "/branding/favicon.png", type: "image/png", sizes: "32x32" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/icon.png",
+    shortcut: "/branding/favicon.ico",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
 };
 

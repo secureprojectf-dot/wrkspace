@@ -46,12 +46,18 @@ interface EmployeeDashboardProps {
 	employee: any;
 	onLogout: () => void;
 	onEmployeeUpdate?: (next: any) => void;
+	/** When set, show only this tab (Flutter More → feature panel). */
+	mobilePanelTab?: EmpTabType;
 }
 
-export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate }: EmployeeDashboardProps) {
-	const [activeTab, setActiveTab] = useState<EmpTabType>('overview');
+export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobilePanelTab }: EmployeeDashboardProps) {
+	const [activeTab, setActiveTab] = useState<EmpTabType>(mobilePanelTab || 'overview');
 	const [empTasks, setEmpTasks] = useState<any[]>([]);
 	const [isTasksLoading, setIsTasksLoading] = useState(false);
+
+	useEffect(() => {
+		if (mobilePanelTab) setActiveTab(mobilePanelTab);
+	}, [mobilePanelTab]);
 
 	// Employee Dashboard attendance states
 	const [attendanceStatus, setAttendanceStatus] = useState<'checked_out' | 'checked_in'>('checked_out');
@@ -540,12 +546,14 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate }: Empl
 	return (
 			<main className={cn(
 			"employee-portal bg-[#e8edf5] text-slate-900 relative flex flex-col font-sans",
-			activeTab === 'messages' ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto"
+			mobilePanelTab ? "min-h-0 h-full overflow-y-auto" : activeTab === 'messages' ? "h-screen overflow-hidden" : "min-h-screen overflow-y-auto"
 		)}>
 			{/* Soft dim wash — less glare than pure white */}
 			<div className="absolute inset-0 z-0 pointer-events-none" />
 
 			{/* Full Width Top Navbar */}
+			{!mobilePanelTab && (
+			<>
 			<header className="w-full border-b border-slate-400 bg-slate-50 sticky top-0 z-50 shadow-sm">
 				<div className="w-full px-6 md:px-10 h-20 flex items-center justify-between">
 					<div className="flex items-center gap-3">
@@ -733,11 +741,15 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate }: Empl
 					</button>
 				</div>
 			</div>
+			</>
+			)}
 
 			{/* Main dashboard content container */}
 			<div className={cn(
 				"flex-1 w-full relative z-10",
-				activeTab === 'messages' ? "h-[calc(100vh-128px)] flex flex-col" : "max-w-[90rem] mx-auto px-6 md:px-10 py-8 space-y-6"
+				mobilePanelTab
+					? "px-4 py-4 space-y-6"
+					: activeTab === 'messages' ? "h-[calc(100vh-128px)] flex flex-col" : "max-w-[90rem] mx-auto px-6 md:px-10 py-8 space-y-6"
 			)}>
 
 				{/* TAB: OVERVIEW */}
