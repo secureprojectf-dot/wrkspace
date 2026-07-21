@@ -3,20 +3,15 @@
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { getApps, getApp, initializeApp } from 'firebase/app';
 import { employeeToken } from '@/lib/mobile-api';
-
-const firebaseConfig = {
-	apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCsO26dKBsPPNWxLrdMhopcfzryizp2_UY',
-	authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'wrkspace-fae94.firebaseapp.com',
-	projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'wrkspace-fae94',
-	storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'wrkspace-fae94.firebasestorage.app',
-	messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '967983667732',
-	appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:967983667732:web:788fba85cb2e11590ca501',
-};
+import { getFirebasePublicConfig } from '@/lib/firebase-public-config';
 
 /** Register FCM web push when supported (Chrome/Android PWA; iOS 16.4+ installed PWA). */
 export async function registerWebPush(_employeeId?: string) {
 	if (typeof window === 'undefined') return;
 	try {
+		const config = getFirebasePublicConfig();
+		if (!config) return;
+
 		const ok = await isSupported();
 		if (!ok) return;
 
@@ -24,14 +19,12 @@ export async function registerWebPush(_employeeId?: string) {
 		if (permission !== 'granted') return;
 
 		if ('serviceWorker' in navigator) {
-			await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+			await navigator.serviceWorker.register('/api/firebase-messaging-sw');
 		}
 
-		const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+		const app = getApps().length ? getApp() : initializeApp(config);
 		const messaging = getMessaging(app);
-		const vapid =
-			process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY ||
-			'';
+		const vapid = (process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '').trim();
 		const token = await getToken(messaging, {
 			vapidKey: vapid || undefined,
 			serviceWorkerRegistration: await navigator.serviceWorker.ready,

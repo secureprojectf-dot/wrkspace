@@ -134,6 +134,10 @@ export function AuthPage() {
 
 	const handleGoogleLogin = async () => {
 		if (isLoading) return;
+		if (!firebaseAuth) {
+			setMessage({ type: 'error', text: 'Google sign-in is not configured on this deployment.' });
+			return;
+		}
 		setIsLoading(true);
 		setMessage(null);
 		try {
