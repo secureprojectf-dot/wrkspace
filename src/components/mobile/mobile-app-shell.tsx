@@ -15,9 +15,12 @@ import { keepCheckedIn, clockOut, startGoingHomeTrip } from '@/app/admin/actions
 import { ensureLocationPermission, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
 import { importWithRetry } from '@/lib/import-with-retry';
 import { registerWebPush, subscribeOfficeExitPush } from '@/lib/web-push';
-import { todayKeyIST } from '@/lib/attendance-geo';
 
 const AUTO_CHECKOUT_MS = 5 * 60 * 1000;
+
+function todayKeyIstClient() {
+	return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
 
 function TabLoading() {
 	return (
@@ -284,7 +287,7 @@ export function MobileAppShell({ employee, onLogout, onEmployeeUpdate }: Props) 
 		try {
 			if (mode === 'office_work') {
 				await keepCheckedIn(employee.id, 'office_work');
-				markOfficeWorkAck(todayKeyIST());
+				markOfficeWorkAck(todayKeyIstClient());
 			} else {
 				await clockOut(employee.id, 'going_home');
 				if (isFemaleEmployee(employee)) {
