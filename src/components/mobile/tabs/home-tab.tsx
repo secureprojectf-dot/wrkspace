@@ -4,15 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import {
 	CalendarDays,
 	ChevronRight,
+	CircleCheck,
 	Clock,
 	FileText,
 	Leaf,
-	ListTodo,
 	LogOut,
 	QrCode,
 	TrendingUp,
-	Shield,
-	Siren,
 } from 'lucide-react';
 import { CorpPageHeader } from '../corp-page-header';
 import { apiGet, apiPost, getPosition, isFemaleEmployee } from '@/lib/mobile-api';
@@ -133,7 +131,7 @@ export function MobileHomeTab({
 	const o = overview || {};
 	const metrics = [
 		{
-			icon: ListTodo,
+			icon: CircleCheck,
 			label: 'Tasks',
 			value: String(o.tasksTotal ?? o.tasksPending ?? 0),
 			sub: `${o.tasksPending ?? 0} open`,
@@ -256,13 +254,18 @@ export function MobileHomeTab({
 				{female ? (
 					<section className="mt-4 rounded-[14px] border border-[#E2E8F0] bg-white p-4">
 						<div className="flex items-center gap-2.5">
-							<div className="flex size-9 items-center justify-center rounded-xl bg-[#9D174D]/10 text-[#9D174D]">
-								<Shield className="size-4" />
-							</div>
+							<img
+								src="/branding/girl-safety-logo.png"
+								alt=""
+								className="size-9 object-contain"
+								onError={(e) => {
+									(e.target as HTMLImageElement).src = '/branding/girl-safety-logo-64.png';
+								}}
+							/>
 							<div className="min-w-0 flex-1">
 								<p className="text-base font-bold text-[#0F172A]">Girl Safety</p>
 								<p className="text-[12.5px] font-medium text-[#64748B]">
-									Track going home after checkout · SOS
+									Track only going home after checkout · SOS
 								</p>
 							</div>
 						</div>
@@ -277,9 +280,8 @@ export function MobileHomeTab({
 							<button
 								type="button"
 								onClick={() => onOpenPanel?.('sos')}
-								className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#B42318] py-3 text-sm font-semibold text-white"
+								className="flex-1 rounded-xl bg-[#B42318] py-3 text-sm font-semibold text-white"
 							>
-								<Siren className="size-4" />
 								SOS
 							</button>
 						</div>
@@ -314,13 +316,15 @@ export function MobileHomeTab({
 																	: 'attendance',
 											)
 										}
-										className="rounded-xl bg-[#F8FAFF] px-3 py-3 text-left"
+										className="rounded-[10px] bg-[#F0F3FF] px-2.5 py-2.5 text-left"
 									>
-										<Icon className="size-4 text-[#0047FF]" />
-										<p className="mt-2 text-[12px] font-semibold text-[#64748B]">{m.label}</p>
-										<p className="text-[15px] font-bold text-[#0F172A]">{m.value}</p>
+										<Icon className="size-[18px] text-[#0047FF]" strokeWidth={2} />
+										<p className="mt-1.5 text-[10px] font-bold uppercase tracking-[0.4px] text-[#64748B]">
+											{m.label}
+										</p>
+										<p className="text-[13.5px] font-bold text-[#0F172A]">{m.value}</p>
 										{m.sub ? (
-											<p className="text-[11px] font-medium text-[#94A3B8]">{m.sub}</p>
+											<p className="text-[10px] font-medium text-[#64748B]">{m.sub}</p>
 										) : null}
 									</button>
 								);
@@ -341,23 +345,26 @@ export function MobileHomeTab({
 						</button>
 					</div>
 					{events.length === 0 ? (
-						<p className="py-4 text-center text-sm text-[#64748B]">No events right now</p>
+						<p className="py-3 text-[13.5px] text-[#64748B]">No upcoming events right now.</p>
 					) : (
-						<ul className="space-y-2">
+						<ul className="divide-y divide-[#E2E8F0]">
 							{events.map((ev: any) => (
-								<li
-									key={ev.id}
-									className="flex items-center gap-2 rounded-xl bg-[#F8FAFF] px-3 py-2.5"
-								>
-									<div className="min-w-0 flex-1">
-										<p className="truncate text-sm font-semibold text-[#0F172A]">
-											{ev.title || ev.name}
-										</p>
-										<p className="text-xs text-[#64748B]">
-											{ev.date || ev.eventDate || ''}
-										</p>
-									</div>
-									<ChevronRight className="size-4 text-[#94A3B8]" />
+								<li key={ev.id}>
+									<button
+										type="button"
+										onClick={() => onOpenPanel?.('events')}
+										className="flex w-full items-center gap-2 py-2.5 text-left"
+									>
+										<div className="min-w-0 flex-1">
+											<p className="truncate text-sm font-semibold text-[#0F172A]">
+												{ev.title || ev.name}
+											</p>
+											<p className="text-xs font-bold text-[#0047FF]">
+												{ev.date || ev.eventDate || ev.startDate || ''}
+											</p>
+										</div>
+										<ChevronRight className="size-4 text-[#94A3B8]" />
+									</button>
 								</li>
 							))}
 						</ul>

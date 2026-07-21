@@ -9,30 +9,34 @@ type Props = {
 	onProfile?: () => void;
 };
 
+/** Matches Flutter CorpPageHeader — brand logo + avatar + name. */
 export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 	const name = employeeDisplayName(employee);
 	return (
 		<header className="shrink-0 bg-gradient-to-br from-[#0047FF] via-[#2B6BFF] to-[#0036C7] text-white">
-			<div className="px-5 pb-6 pt-[max(20px,env(safe-area-inset-top))]">
+			<div
+				className="px-5 pb-6 pt-[max(20px,env(safe-area-inset-top))]"
+				style={{ minHeight: 'calc(152px + env(safe-area-inset-top))' }}
+			>
 				<div className="flex h-[152px] flex-col justify-center">
 					<div className="flex items-center gap-3">
 						<div className="min-w-0 flex-1">
+							{/* Same asset as Flutter BrandLogo(onDark) */}
 							<img
-								src="/icon.png"
+								src="/branding/wrkspace-logo-on-dark.png"
 								alt="wrkspace"
-								className="h-7 w-auto object-contain brightness-0 invert"
+								className="h-7 w-auto max-w-[168px] object-contain object-left"
 								onError={(e) => {
-									(e.target as HTMLImageElement).style.display = 'none';
+									const el = e.target as HTMLImageElement;
+									el.src = '/branding/wrkspace-logo.png';
+									el.classList.add('brightness-0', 'invert');
 								}}
 							/>
-							<p className="mt-0.5 text-[13px] font-semibold tracking-wide text-white/90">
-								wrkspace
-							</p>
 						</div>
 						<button
 							type="button"
 							onClick={onProfile}
-							className="shrink-0 rounded-full ring-2 ring-white/40"
+							className="shrink-0 rounded-full ring-[2.5px] ring-white/35"
 							aria-label="Open profile"
 						>
 							<ChatAvatar
@@ -43,9 +47,13 @@ export function CorpPageHeader({ employee, subtitle, onProfile }: Props) {
 							/>
 						</button>
 					</div>
-					<p className="mt-3.5 truncate text-[22px] font-bold leading-tight">{name}</p>
+					<p className="mt-3.5 truncate text-[22px] font-bold leading-tight tracking-[-0.3px]">
+						{name}
+					</p>
 					{subtitle ? (
-						<p className="mt-1 text-[13px] font-medium text-white/80">{subtitle}</p>
+						<p className="mt-[5px] truncate text-[13.5px] font-medium text-white/80">
+							{subtitle}
+						</p>
 					) : null}
 				</div>
 			</div>
