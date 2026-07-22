@@ -2025,7 +2025,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										</div>
 										<div className="space-y-1">
 											<label className="text-[10px] text-zinc-400 uppercase font-medium">Check-Out Time (Optional)</label>
-											<Input type="text" name="checkOut" placeholder="e.g. 06:30 PM / 09:30 PM" className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+											<Input type="text" name="checkOut" placeholder="e.g. 07:00 PM / 09:30 PM" className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
 										</div>
 									</div>
 									<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-none cursor-pointer">

@@ -4,14 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GoogleSignInButton } from '@/components/ui/google-sign-in-button';
 import { firebaseAuth, googleProvider } from '@/lib/firebase-client';
 import { signInWithPopup } from 'firebase/auth';
+import { EmployeeProfessionalProfileEditor } from '@/components/ui/employee-professional-profile';
 import './verification.css';
 
 const SESSION_KEY = 'wrkspace_verification_session';
+const EMP_TOKEN_KEY = 'wrkspace_employee_token';
 
 type PortalUser = {
 	id: string;
 	email: string;
-	role: 'SUPER' | 'COMPANY';
+	role: 'SUPER' | 'COMPANY' | 'EMPLOYEE';
 	companyId?: string | null;
 	companyName?: string | null;
 	source: string;
@@ -29,9 +31,10 @@ type EmpRow = {
 	role: string;
 	photoUrl?: string | null;
 	joinedAt?: string;
+	employmentStatus?: string;
 };
 
-type DossierTab = 'overview' | 'attendance' | 'tasks' | 'submissions' | 'leaves' | 'events';
+type DossierTab = 'overview' | 'attendance' | 'tasks' | 'submissions' | 'leaves' | 'events' | 'edit_profile';
 
 function loadSession(): Session | null {
 	try {
@@ -64,11 +67,19 @@ function initials(name: string) {
 export function EmployeeVerificationApp() {
 	const [session, setSession] = useState<Session | null>(null);
 	const [ready, setReady] = useState(false);
+	const [loginMode, setLoginMode] = useState<'org' | 'employee'>('org');
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [showPass, setShowPass] = useState(false);
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState('');
+
+	// Employee self-service login (fill / view own professional profile only).
+	const [empEmail, setEmpEmail] = useState('');
+	const [empPassword, setEmpPassword] = useState('');
+	const [empShowPass, setEmpShowPass] = useState(false);
+	const [empRecord, setEmpRecord] = useState<any | null>(null);
+	const [statusSaving, setStatusSaving] = useState(false);
 	const [q, setQ] = useState('');
 	const [wingFilter, setWingFilter] = useState('all');
 	const [employees, setEmployees] = useState<EmpRow[]>([]);
@@ -113,6 +124,12 @@ export function EmployeeVerificationApp() {
 		setEmployees([]);
 		setDossier(null);
 		setSelectedId(null);
+		setEmpRecord(null);
+		try {
+			localStorage.removeItem(EMP_TOKEN_KEY);
+		} catch {
+			/* ignore */
+		}
 	};
 
 	const applyLogin = (data: any) => {
@@ -120,6 +137,67 @@ export function EmployeeVerificationApp() {
 		saveSession(next);
 		setSession(next);
 		setError('');
+	};
+
+	/** Employees log in with their normal wrkspace credentials to fill/view ONLY their own profile. */
+	const loginEmployee = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setBusy(true);
+		setError('');
+		try {
+			const res = await fetch('/api/auth/login', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ email: empEmail, password: empPassword }),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data?.error || 'Login failed');
+			const emp = data.employee || {};
+			// Reuse the shared professional-profile editor's own auth lookup.
+			try {
+				localStorage.setItem(EMP_TOKEN_KEY, data.token);
+			} catch {
+				/* ignore */
+			}
+			setEmpRecord(emp);
+			const next: Session = {
+				token: data.token,
+				user: {
+					id: emp.id,
+					email: emp.email,
+					role: 'EMPLOYEE',
+					companyId: null,
+					companyName: null,
+					source: 'employee',
+				},
+			};
+			saveSession(next);
+			setSession(next);
+		} catch (err: any) {
+			setError(String(err?.message || err));
+		} finally {
+			setBusy(false);
+		}
+	};
+
+	/** SUPER-only: toggle an employee's Active/Inactive status (shown to public/company viewers). */
+	const setEmploymentStatus = async (employeeId: string, status: 'Active' | 'Inactive') => {
+		setStatusSaving(true);
+		try {
+			const res = await fetch(`/api/verification/employees/${encodeURIComponent(employeeId)}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json', ...authHeaders },
+				body: JSON.stringify({ employmentStatus: status }),
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(data?.error || 'Failed to update status');
+			setDossier((d: any) => (d ? { ...d, employee: { ...d.employee, employmentStatus: status } } : d));
+			setEmployees((rows) => rows.map((r) => (r.id === employeeId ? { ...r, employmentStatus: status } : r)));
+		} catch (err: any) {
+			setError(String(err?.message || err));
+		} finally {
+			setStatusSaving(false);
+		}
 	};
 
 	const flashCopy = (label: string) => {
@@ -185,7 +263,7 @@ export function EmployeeVerificationApp() {
 	};
 
 	const loadEmployees = useCallback(async () => {
-		if (!session?.token) return;
+		if (!session?.token || session.user.role === 'EMPLOYEE') return;
 		try {
 			const qs = q.trim() ? `?q=${encodeURIComponent(q.trim())}` : '';
 			const res = await fetch(`/api/verification/employees${qs}`, {
@@ -260,20 +338,30 @@ export function EmployeeVerificationApp() {
 		const e = dossier.employee;
 		const p = dossier.profile || {};
 		const s = dossier.summary;
+		const skillsFlat = Object.values(p.skills || {})
+			.flat()
+			.filter(Boolean);
 		const text = [
 			`EMPLOYEE VERIFICATION — wrkspace`,
-			`Name: ${e.name}`,
+			`Name: ${e.name}${p.professionalTitle ? ` — ${p.professionalTitle}` : ''}`,
 			`ID: ${e.id}`,
 			`Role: ${e.role} · Wing: ${e.wingName}`,
 			`Email: ${e.email} · Phone: ${e.phone}`,
+			`Location: ${[p.city, p.state, p.country].filter(Boolean).join(', ') || '—'}`,
 			`Tenure: ${e.tenureDays} days`,
-			`About: ${p.about || '—'}`,
+			`Resume summary: ${p.about || '—'}`,
+			`Career objective: ${p.careerObjective || '—'}`,
+			`Years of experience: ${p.yearsOfExperience || '—'} · Industry: ${p.industry || '—'}`,
 			`Remarks: ${p.remarks || '—'}`,
 			`EC: ${[p.emergencyContactName, p.emergencyContactPhone, p.emergencyContactRelation].filter(Boolean).join(' · ') || '—'}`,
-			`Qualifications: ${(p.qualifications || []).map((q: any) => q.degree).filter(Boolean).join('; ') || '—'}`,
+			`Education: ${(p.education || []).map((q: any) => q.degree).filter(Boolean).join('; ') || '—'}`,
+			`Skills: ${skillsFlat.join(', ') || '—'}`,
 			`Certifications: ${(p.certifications || []).map((c: any) => c.name).filter(Boolean).join('; ') || '—'}`,
 			`Experience: ${(p.experience || []).map((x: any) => `${x.title}@${x.company}`).filter(Boolean).join('; ') || '—'}`,
+			`Internships: ${(p.internships || []).map((x: any) => `${x.title}@${x.company}`).filter(Boolean).join('; ') || '—'}`,
 			`Projects: ${(p.projects || []).map((pr: any) => pr.name).filter(Boolean).join('; ') || '—'}`,
+			`Achievements: ${(p.achievements || []).map((a: any) => a.title).filter(Boolean).join('; ') || '—'}`,
+			`Publications: ${(p.publications || []).map((pub: any) => pub.title).filter(Boolean).join('; ') || '—'}`,
 			`Attendance days: ${s?.attendanceDays} · Tasks ${s?.tasksCompleted}/${s?.tasksTotal} · Submissions ${s?.submissionsTotal}`,
 			`Generated: ${new Date().toLocaleString()}`,
 		].join('\n');
@@ -306,13 +394,14 @@ export function EmployeeVerificationApp() {
 							<p className="ev-kicker">Employee verification</p>
 							<h1>Company-grade employee history</h1>
 							<p className="ev-lead">
-								Review attendance, tasks, submissions, leaves, and risk signals before you decide.
-								This is not the employee app.
+								One portal, three access levels — companies see general status only, employees
+								fill in their own professional profile, and wrkspace admins see and edit
+								everything.
 							</p>
 							<ul className="ev-brand-points">
-								<li>Full workplace dossier per employee</li>
-								<li>Strengths, weaknesses &amp; priority notes</li>
-								<li>Share read access with partner companies</li>
+								<li>Public / company: name, role, wing &amp; active-inactive status</li>
+								<li>Employees: fill &amp; view only your own professional profile</li>
+								<li>Admins: full dossier, edits &amp; remarks for every employee</li>
 							</ul>
 						</div>
 					</aside>
@@ -321,69 +410,150 @@ export function EmployeeVerificationApp() {
 						<div className="ev-login-card">
 							<p className="ev-kicker">Sign in</p>
 							<h2>Verification access</h2>
-							<p className="ev-sub">
-								Use your <strong>Admin panel</strong> email &amp; password — or a company login
-								shared by wrkspace. Same credentials as{' '}
-								<a href="/admin" style={{ color: '#8eb0ff' }}>
-									/admin
-								</a>
-								.
-							</p>
+
+							<div className="ev-login-mode-toggle" role="tablist">
+								<button
+									type="button"
+									role="tab"
+									aria-selected={loginMode === 'org'}
+									className={`ev-mode-tab ${loginMode === 'org' ? 'is-active' : ''}`}
+									onClick={() => {
+										setLoginMode('org');
+										setError('');
+									}}
+								>
+									Company / Admin
+								</button>
+								<button
+									type="button"
+									role="tab"
+									aria-selected={loginMode === 'employee'}
+									className={`ev-mode-tab ${loginMode === 'employee' ? 'is-active' : ''}`}
+									onClick={() => {
+										setLoginMode('employee');
+										setError('');
+									}}
+								>
+									I&apos;m an employee
+								</button>
+							</div>
 
 							{error ? (
 								<div className="ev-alert ev-alert-error" role="alert">
 									<strong>{error}</strong>
-									{error.toLowerCase().includes('invalid') ? (
+									{loginMode === 'org' && error.toLowerCase().includes('invalid') ? (
 										<span>
-											Employee portal logins do not work here. Use an Admin panel account.
+											Employee logins go under the &quot;I&apos;m an employee&quot; tab above.
 										</span>
 									) : null}
 								</div>
 							) : null}
 
-							<form onSubmit={loginEmail} className="ev-form">
-								<label className="ev-field">
-									<span>Admin / company email</span>
-									<input
-										type="email"
-										required
-										autoComplete="username"
-										value={email}
-										onChange={(e) => setEmail(e.target.value)}
-										placeholder="your admin email"
-									/>
-								</label>
-								<label className="ev-field">
-									<span>Password (same as Admin panel)</span>
-									<div className="ev-pass-row">
-										<input
-											type={showPass ? 'text' : 'password'}
-											required
-											autoComplete="current-password"
-											value={password}
-											onChange={(e) => setPassword(e.target.value)}
-											placeholder="Your /admin password"
-										/>
-										<button type="button" className="ev-ghost-btn" onClick={() => setShowPass((v) => !v)}>
-											{showPass ? 'Hide' : 'Show'}
+							{loginMode === 'org' ? (
+								<>
+									<p className="ev-sub">
+										Use your <strong>Admin panel</strong> email &amp; password — or a company
+										login shared by wrkspace. General, view-only access to each employee&apos;s
+										active/inactive status and basic details. Same credentials as{' '}
+										<a href="/admin" style={{ color: '#8eb0ff' }}>
+											/admin
+										</a>
+										.
+									</p>
+									<form onSubmit={loginEmail} className="ev-form">
+										<label className="ev-field">
+											<span>Admin / company email</span>
+											<input
+												type="email"
+												required
+												autoComplete="username"
+												value={email}
+												onChange={(e) => setEmail(e.target.value)}
+												placeholder="your admin email"
+											/>
+										</label>
+										<label className="ev-field">
+											<span>Password (same as Admin panel)</span>
+											<div className="ev-pass-row">
+												<input
+													type={showPass ? 'text' : 'password'}
+													required
+													autoComplete="current-password"
+													value={password}
+													onChange={(e) => setPassword(e.target.value)}
+													placeholder="Your /admin password"
+												/>
+												<button
+													type="button"
+													className="ev-ghost-btn"
+													onClick={() => setShowPass((v) => !v)}
+												>
+													{showPass ? 'Hide' : 'Show'}
+												</button>
+											</div>
+										</label>
+										<button type="submit" disabled={busy} className="ev-btn ev-btn-primary">
+											{busy ? 'Signing in…' : 'Sign in with email'}
 										</button>
+									</form>
+
+									<div className="ev-or">
+										<span>or</span>
 									</div>
-								</label>
-								<button type="submit" disabled={busy} className="ev-btn ev-btn-primary">
-									{busy ? 'Signing in…' : 'Sign in with email'}
-								</button>
-							</form>
 
-							<div className="ev-or">
-								<span>or</span>
-							</div>
-
-							<GoogleSignInButton
-								onClick={loginGoogle}
-								disabled={busy}
-								loading={busy}
-								label="Continue with Google (admin Gmail)"
-							/>
+									<GoogleSignInButton
+										onClick={loginGoogle}
+										disabled={busy}
+										loading={busy}
+										label="Continue with Google (admin Gmail)"
+									/>
+								</>
+							) : (
+								<>
+									<p className="ev-sub">
+										Use your normal wrkspace employee email &amp; password. You&apos;ll be able
+										to fill in and view <strong>only your own</strong> professional profile
+										(personal info, summary, experience, education, skills, projects,
+										certifications, achievements &amp; more).
+									</p>
+									<form onSubmit={loginEmployee} className="ev-form">
+										<label className="ev-field">
+											<span>Employee email</span>
+											<input
+												type="email"
+												required
+												autoComplete="username"
+												value={empEmail}
+												onChange={(e) => setEmpEmail(e.target.value)}
+												placeholder="your employee email"
+											/>
+										</label>
+										<label className="ev-field">
+											<span>Password</span>
+											<div className="ev-pass-row">
+												<input
+													type={empShowPass ? 'text' : 'password'}
+													required
+													autoComplete="current-password"
+													value={empPassword}
+													onChange={(e) => setEmpPassword(e.target.value)}
+													placeholder="Your wrkspace password"
+												/>
+												<button
+													type="button"
+													className="ev-ghost-btn"
+													onClick={() => setEmpShowPass((v) => !v)}
+												>
+													{empShowPass ? 'Hide' : 'Show'}
+												</button>
+											</div>
+										</label>
+										<button type="submit" disabled={busy} className="ev-btn ev-btn-primary">
+											{busy ? 'Signing in…' : 'Sign in as employee'}
+										</button>
+									</form>
+								</>
+							)}
 
 							<nav className="ev-login-links">
 								<a href="/admin">Admin panel</a>
@@ -391,6 +561,43 @@ export function EmployeeVerificationApp() {
 							</nav>
 						</div>
 					</section>
+				</div>
+			</main>
+		);
+	}
+
+	if (session.user.role === 'EMPLOYEE') {
+		return (
+			<main className="ev-root ev-app">
+				<header className="ev-topbar print:hidden">
+					<div className="ev-topbar-inner">
+						<div className="ev-topbar-brand">
+							<img src="/branding/wrkspace-logo-on-dark.png" alt="" className="ev-top-logo" />
+							<div>
+								<p className="ev-kicker">Employee verification</p>
+								<p className="ev-top-user">
+									{[empRecord?.firstName, empRecord?.lastName].filter(Boolean).join(' ') ||
+										session.user.email}
+									<span className="ev-pill">EMPLOYEE</span>
+								</p>
+							</div>
+						</div>
+					</div>
+					<div className="ev-topbar-actions">
+						<button type="button" className="ev-nav-btn ev-nav-muted" onClick={logout}>
+							Sign out
+						</button>
+					</div>
+				</header>
+				<div className="ev-shell">
+					<div className="ev-card" style={{ marginBottom: 16 }}>
+						<h2 style={{ margin: 0 }}>My professional profile</h2>
+						<p className="ev-muted" style={{ marginTop: 6 }}>
+							Fill in your details below. This is what wrkspace admins see when reviewing your
+							profile — public / company viewers only ever see your name, role and active status.
+						</p>
+					</div>
+					<EmployeeProfessionalProfileEditor employee={empRecord} onEmployeeUpdate={setEmpRecord} />
 				</div>
 			</main>
 		);
@@ -632,7 +839,16 @@ export function EmployeeVerificationApp() {
 											<span className="ev-avatar ev-avatar-fallback">{initials(e.name)}</span>
 										)}
 										<span className="ev-emp-meta">
-											<span className="ev-emp-name">{e.name}</span>
+											<span className="ev-emp-name">
+												{e.name}
+												<span
+													className={`ev-status-pill ev-status-pill-sm ${
+														e.employmentStatus === 'Inactive' ? 'is-inactive' : 'is-active'
+													}`}
+												>
+													{e.employmentStatus === 'Inactive' ? 'Inactive' : 'Active'}
+												</span>
+											</span>
 											<span className="ev-emp-sub">
 												{e.role} · {e.wingName}
 											</span>
@@ -719,7 +935,10 @@ export function EmployeeVerificationApp() {
 												['submissions', 'Submissions'],
 												['leaves', 'Leaves'],
 												['events', 'Events'],
-											] as const
+												...(session.user.role === 'SUPER'
+													? ([['edit_profile', 'Edit profile (admin)']] as [DossierTab, string][])
+													: []),
+											] as [DossierTab, string][]
 										).map(([id, label]) => (
 											<button
 												key={id}
@@ -744,31 +963,154 @@ export function EmployeeVerificationApp() {
 								{dossierTab === 'overview' ? (
 									<div className="ev-overview">
 										{(() => {
+											// Public / company viewers only get general info + employment status.
+											// The deep company-facing professional profile is admin (SUPER) only.
+											if (session.user.role !== 'SUPER') {
+												return (
+													<div className="ev-card">
+														<h3>General information</h3>
+														<div className="ev-info-grid">
+															<div className="ev-info-item">
+																<span>Employment status</span>
+																<strong>
+																	<span
+																		className={`ev-status-pill ${
+																			emp?.employmentStatus === 'Inactive' ? 'is-inactive' : 'is-active'
+																		}`}
+																	>
+																		{emp?.employmentStatus === 'Inactive' ? 'Inactive' : 'Active'}
+																	</span>
+																</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Role</span>
+																<strong>{emp?.role || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Wing</span>
+																<strong>{emp?.wingName || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Wing lead</span>
+																<strong>{emp?.wingLeadName || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Email</span>
+																<strong>{emp?.email || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Phone</span>
+																<strong>{emp?.phone || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Tenure</span>
+																<strong>{emp?.tenureDays != null ? `${emp.tenureDays} days` : '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Joined</span>
+																<strong>
+																	{emp?.createdAt ? new Date(emp.createdAt).toLocaleDateString() : '—'}
+																</strong>
+															</div>
+														</div>
+														<p className="ev-muted" style={{ marginTop: 12 }}>
+															The full professional profile (résumé, experience, education, skills,
+															projects &amp; more) is only visible to wrkspace admins.
+														</p>
+													</div>
+												);
+											}
+
 											const p = dossier.profile || {};
-											const quals = Array.isArray(p.qualifications) ? p.qualifications : [];
+											const education = Array.isArray(p.education) ? p.education : [];
 											const certs = Array.isArray(p.certifications) ? p.certifications : [];
 											const exp = Array.isArray(p.experience) ? p.experience : [];
+											const internships = Array.isArray(p.internships) ? p.internships : [];
 											const projs = Array.isArray(p.projects) ? p.projects : [];
+											const achievements = Array.isArray(p.achievements) ? p.achievements : [];
+											const publications = Array.isArray(p.publications) ? p.publications : [];
+											const customSections = Array.isArray(p.customSections) ? p.customSections : [];
+											const skills = p.skills || {};
+											const skillGroups: [string, string][] = [
+												['programmingLanguages', 'Programming Languages'],
+												['frontend', 'Frontend'],
+												['backend', 'Backend'],
+												['database', 'Database'],
+												['cloud', 'Cloud'],
+												['devops', 'DevOps'],
+												['tools', 'Tools'],
+												['softSkills', 'Soft Skills'],
+											];
+											const hasAnySkill = skillGroups.some(([k]) => Array.isArray(skills[k]) && skills[k].length > 0);
 											const hasEc =
 												p.emergencyContactName || p.emergencyContactPhone || p.emergencyContactRelation;
+											const links: [string, string, string][] = [
+												['LinkedIn', p.linkedinUrl, '🔗'],
+												['GitHub', p.githubUrl, '🔗'],
+												['Portfolio', p.portfolioUrl, '🔗'],
+												['LeetCode', p.leetcodeUrl, '🔗'],
+												['Codeforces', p.codeforcesUrl, '🔗'],
+												['CodeChef', p.codechefUrl, '🔗'],
+												['HackerRank', p.hackerrankUrl, '🔗'],
+											];
+
 											return (
 												<>
 													<div className="ev-card">
-														<h3>About</h3>
-														<p className="ev-prose">
-															{p.about?.trim()
-																? p.about
-																: 'No about section yet — employee can add this in Profile.'}
-														</p>
+														<h3>Personal information</h3>
+														<div className="ev-info-grid">
+															<div className="ev-info-item">
+																<span>Professional title</span>
+																<strong>{p.professionalTitle || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Location</span>
+																<strong>{[p.city, p.state, p.country].filter(Boolean).join(', ') || '—'}</strong>
+															</div>
+															{links.map(([label, url]) =>
+																url ? (
+																	<div className="ev-info-item" key={label}>
+																		<span>{label}</span>
+																		<a href={url} target="_blank" rel="noreferrer">
+																			{url.replace(/^https?:\/\//, '')}
+																		</a>
+																	</div>
+																) : null,
+															)}
+														</div>
+														{links.every(([, url]) => !url) ? (
+															<p className="ev-muted" style={{ marginTop: 10 }}>
+																No links or coding profiles added yet.
+															</p>
+														) : null}
 													</div>
 
 													<div className="ev-card">
-														<h3>Remarks</h3>
-														<p className="ev-prose">
-															{p.remarks?.trim()
-																? p.remarks
-																: 'No remarks yet.'}
-														</p>
+														<h3>Professional summary</h3>
+														<div className="ev-subsection">
+															<p className="ev-muted" style={{ marginBottom: 4 }}>Resume summary</p>
+															<p className="ev-prose">
+																{p.about?.trim() ? p.about : 'No resume summary yet — employee can add this in Profile.'}
+															</p>
+														</div>
+														<div className="ev-subsection">
+															<p className="ev-muted" style={{ marginBottom: 4 }}>Career objective</p>
+															<p className="ev-prose">{p.careerObjective?.trim() ? p.careerObjective : 'Not provided.'}</p>
+														</div>
+														<div className="ev-subsection ev-info-grid">
+															<div className="ev-info-item">
+																<span>Years of experience</span>
+																<strong>{p.yearsOfExperience || '—'}</strong>
+															</div>
+															<div className="ev-info-item">
+																<span>Industry</span>
+																<strong>{p.industry || '—'}</strong>
+															</div>
+														</div>
+														<div className="ev-subsection">
+															<p className="ev-muted" style={{ marginBottom: 4 }}>Remarks</p>
+															<p className="ev-prose">{p.remarks?.trim() ? p.remarks : 'No remarks yet.'}</p>
+														</div>
 													</div>
 
 													<div className="ev-card">
@@ -789,19 +1131,129 @@ export function EmployeeVerificationApp() {
 													</div>
 
 													<div className="ev-card">
-														<h3>Qualifications</h3>
-														{quals.length === 0 ? (
+														<h3>Education</h3>
+														{education.length === 0 ? (
 															<p className="ev-muted">None listed.</p>
 														) : (
 															<ul className="ev-notes">
-																{quals.map((q: any) => (
+																{education.map((q: any) => (
 																	<li key={q.id || q.degree}>
 																		<strong>{q.degree}</strong>
 																		{q.institution ? ` — ${q.institution}` : ''}
-																		{q.year ? ` (${q.year})` : ''}
-																		{q.details ? (
-																			<span className="ev-muted"> · {q.details}</span>
+																		{q.specialization ? ` (${q.specialization})` : ''}
+																		{q.from || q.to ? (
+																			<span className="ev-muted"> · {q.from || '?'} – {q.to || '?'}</span>
 																		) : null}
+																		{q.cgpa ? <span className="ev-muted"> · CGPA {q.cgpa}</span> : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Skills</h3>
+														{!hasAnySkill ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															skillGroups.map(([key, label]) => {
+																const tags = Array.isArray(skills[key]) ? skills[key] : [];
+																if (!tags.length) return null;
+																return (
+																	<div className="ev-skill-group" key={key}>
+																		<span>{label}</span>
+																		<div className="ev-tag-row">
+																			{tags.map((t: string) => (
+																				<span className="ev-tag" key={t}>
+																					{t}
+																				</span>
+																			))}
+																		</div>
+																	</div>
+																);
+															})
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Work experience</h3>
+														{exp.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{exp.map((x: any) => (
+																	<li key={x.id || `${x.title}-${x.company}`}>
+																		<strong>{x.title}</strong>
+																		{x.company ? ` @ ${x.company}` : ''}
+																		{x.employmentType ? <span className="ev-muted"> · {x.employmentType}</span> : null}
+																		<span className="ev-muted">
+																			{' '}
+																			· {x.from || '?'} – {x.current ? 'Present' : x.to || '?'}
+																			{x.location ? ` · ${x.location}` : ''}
+																		</span>
+																		{x.description ? <div className="ev-muted">{x.description}</div> : null}
+																		{x.technologiesUsed ? (
+																			<div className="ev-muted">Tech: {x.technologiesUsed}</div>
+																		) : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Internships</h3>
+														{internships.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{internships.map((x: any) => (
+																	<li key={x.id || `${x.title}-${x.company}`}>
+																		<strong>{x.title}</strong>
+																		{x.company ? ` @ ${x.company}` : ''}
+																		<span className="ev-muted">
+																			{' '}
+																			· {x.from || '?'} – {x.current ? 'Present' : x.to || '?'}
+																			{x.location ? ` · ${x.location}` : ''}
+																		</span>
+																		{x.description ? <div className="ev-muted">{x.description}</div> : null}
+																		{x.technologiesUsed ? (
+																			<div className="ev-muted">Tech: {x.technologiesUsed}</div>
+																		) : null}
+																	</li>
+																))}
+															</ul>
+														)}
+													</div>
+
+													<div className="ev-card">
+														<h3>Projects</h3>
+														{projs.length === 0 ? (
+															<p className="ev-muted">None listed.</p>
+														) : (
+															<ul className="ev-notes">
+																{projs.map((pr: any) => (
+																	<li key={pr.id || pr.name}>
+																		<strong>{pr.name}</strong>
+																		{pr.role ? ` · ${pr.role}` : ''}
+																		{pr.tech ? <span className="ev-muted"> · {pr.tech}</span> : null}
+																		{pr.githubUrl ? (
+																			<>
+																				{' · '}
+																				<a href={pr.githubUrl} target="_blank" rel="noreferrer">
+																					GitHub
+																				</a>
+																			</>
+																		) : null}
+																		{pr.liveUrl ? (
+																			<>
+																				{' · '}
+																				<a href={pr.liveUrl} target="_blank" rel="noreferrer">
+																					Live demo
+																				</a>
+																			</>
+																		) : null}
+																		{pr.description ? <div className="ev-muted">{pr.description}</div> : null}
 																	</li>
 																))}
 															</ul>
@@ -818,7 +1270,8 @@ export function EmployeeVerificationApp() {
 																	<li key={c.id || c.name}>
 																		<strong>{c.name}</strong>
 																		{c.issuer ? ` — ${c.issuer}` : ''}
-																		{c.year ? ` (${c.year})` : ''}
+																		{c.issueDate ? ` (${c.issueDate})` : ''}
+																		{c.credentialId ? <span className="ev-muted"> · ID: {c.credentialId}</span> : null}
 																		{c.credentialUrl ? (
 																			<>
 																				{' · '}
@@ -842,22 +1295,25 @@ export function EmployeeVerificationApp() {
 													</div>
 
 													<div className="ev-card">
-														<h3>Experience</h3>
-														{exp.length === 0 ? (
+														<h3>Achievements &amp; awards</h3>
+														{achievements.length === 0 ? (
 															<p className="ev-muted">None listed.</p>
 														) : (
 															<ul className="ev-notes">
-																{exp.map((x: any) => (
-																	<li key={x.id || `${x.title}-${x.company}`}>
-																		<strong>{x.title}</strong>
-																		{x.company ? ` @ ${x.company}` : ''}
-																		<span className="ev-muted">
-																			{' '}
-																			· {x.from || '?'} – {x.current ? 'Present' : x.to || '?'}
-																		</span>
-																		{x.description ? (
-																			<div className="ev-muted">{x.description}</div>
+																{achievements.map((a: any) => (
+																	<li key={a.id || a.title}>
+																		<strong>{a.title}</strong>
+																		{a.organization ? ` — ${a.organization}` : ''}
+																		{a.date ? ` (${a.date})` : ''}
+																		{a.fileUrl ? (
+																			<>
+																				{' · '}
+																				<a href={a.fileUrl} target="_blank" rel="noreferrer">
+																					View file
+																				</a>
+																			</>
 																		) : null}
+																		{a.description ? <div className="ev-muted">{a.description}</div> : null}
 																	</li>
 																))}
 															</ul>
@@ -865,35 +1321,44 @@ export function EmployeeVerificationApp() {
 													</div>
 
 													<div className="ev-card">
-														<h3>Projects</h3>
-														{projs.length === 0 ? (
+														<h3>Publications &amp; research</h3>
+														{publications.length === 0 ? (
 															<p className="ev-muted">None listed.</p>
 														) : (
 															<ul className="ev-notes">
-																{projs.map((pr: any) => (
-																	<li key={pr.id || pr.name}>
-																		<strong>{pr.name}</strong>
-																		{pr.role ? ` · ${pr.role}` : ''}
-																		{pr.year ? ` (${pr.year})` : ''}
-																		{pr.tech ? (
-																			<span className="ev-muted"> · {pr.tech}</span>
+																{publications.map((pub: any) => (
+																	<li key={pub.id || pub.title}>
+																		<strong>{pub.title}</strong>
+																		{pub.year ? ` (${pub.year})` : ''}
+																		{pub.authors ? <div className="ev-muted">{pub.authors}</div> : null}
+																		{pub.journal || pub.conference ? (
+																			<div className="ev-muted">{[pub.journal, pub.conference].filter(Boolean).join(' · ')}</div>
 																		) : null}
-																		{pr.url ? (
-																			<>
-																				{' · '}
-																				<a href={pr.url} target="_blank" rel="noreferrer">
-																					Link
+																		{pub.url ? (
+																			<div>
+																				<a href={pub.url} target="_blank" rel="noreferrer">
+																					DOI / link
 																				</a>
-																			</>
+																			</div>
 																		) : null}
-																		{pr.description ? (
-																			<div className="ev-muted">{pr.description}</div>
-																		) : null}
+																		{pub.abstract ? <div className="ev-muted">{pub.abstract}</div> : null}
 																	</li>
 																))}
 															</ul>
 														)}
 													</div>
+
+													{customSections.length > 0 ? (
+														<div className="ev-card">
+															<h3>Additional sections</h3>
+															{customSections.map((c: any) => (
+																<div className="ev-subsection" key={c.id || c.title}>
+																	<p className="ev-muted" style={{ marginBottom: 4 }}>{c.title}</p>
+																	<p className="ev-prose">{c.content}</p>
+																</div>
+															))}
+														</div>
+													) : null}
 
 													<div className="ev-kpi-grid">
 														{[
@@ -967,6 +1432,52 @@ export function EmployeeVerificationApp() {
 											ev.venueAddress || '—',
 										]}
 									/>
+								) : null}
+
+								{dossierTab === 'edit_profile' && session.user.role === 'SUPER' && emp ? (
+									<div className="ev-admin-edit print:hidden">
+										<div className="ev-card" style={{ marginBottom: 16 }}>
+											<h3>Employment status</h3>
+											<p className="ev-muted" style={{ marginBottom: 10 }}>
+												Controls what public / company viewers see for this employee.
+											</p>
+											<div className="ev-inline-actions">
+												{(['Active', 'Inactive'] as const).map((s) => (
+													<button
+														key={s}
+														type="button"
+														disabled={statusSaving}
+														className={`ev-chip ${
+															(emp?.employmentStatus || 'Active') === s ? 'is-active' : ''
+														}`}
+														onClick={() => void setEmploymentStatus(emp.id, s)}
+													>
+														{s}
+													</button>
+												))}
+											</div>
+										</div>
+										<EmployeeProfessionalProfileEditor
+											employee={emp}
+											canEditRemarks
+											onEmployeeUpdate={(next) =>
+												setDossier((d: any) => (d ? { ...d, employee: { ...d.employee, ...next } } : d))
+											}
+											saveOverride={async (profile) => {
+												const res = await fetch(
+													`/api/verification/employees/${encodeURIComponent(emp.id)}`,
+													{
+														method: 'PATCH',
+														headers: { 'Content-Type': 'application/json', ...authHeaders },
+														body: JSON.stringify(profile),
+													},
+												);
+												const data = await res.json().catch(() => ({}));
+												if (!res.ok) throw new Error(data?.error || 'Save failed');
+												return { employee: data.employee, profile: data.profile };
+											}}
+										/>
+									</div>
 								) : null}
 							</div>
 						)}

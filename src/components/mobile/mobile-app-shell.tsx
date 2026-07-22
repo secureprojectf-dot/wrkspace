@@ -93,7 +93,6 @@ const EmployeeDashboard = dynamic(
 		),
 	{ ssr: false },
 );
-
 type Section = 'home' | 'tasks' | 'messages' | 'more';
 
 type Props = {

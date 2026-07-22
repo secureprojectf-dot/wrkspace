@@ -13,7 +13,10 @@ import {
 import { AdminDashboard } from './admin-dashboard';
 import { Input } from './input';
 import { cn } from '@/lib/utils';
-import { loginAdmin, sendOtp, verifyOtpAndResetPassword, getAdminByInviteToken } from '@/app/admin/actions';
+import { loginAdmin, loginAdminWithGoogle, sendOtp, verifyOtpAndResetPassword, getAdminByInviteToken } from '@/app/admin/actions';
+import { GoogleSignInButton } from './google-sign-in-button';
+import { firebaseAuth, googleProvider } from '@/lib/firebase-client';
+import { signInWithPopup } from 'firebase/auth';
 
 type FormState = 'login' | 'forgot-request' | 'forgot-verify' | 'dashboard';
 
@@ -97,6 +100,37 @@ export function AdminPage() {
 			}
 		} catch (error: any) {
 			setMessage({ type: 'error', text: 'An unexpected error occurred.' });
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleGoogleLogin = async () => {
+		if (isLoading) return;
+		setIsLoading(true);
+		setMessage(null);
+		try {
+			const cred = await signInWithPopup(firebaseAuth, googleProvider);
+			const googleEmail = cred.user?.email;
+			if (!googleEmail) {
+				setMessage({ type: 'error', text: 'Google sign-in did not return an email.' });
+				return;
+			}
+			const result = await loginAdminWithGoogle(googleEmail);
+			if (result.success && result.email) {
+				setEmail(result.email);
+				localStorage.setItem('wrkspace_admin_session', JSON.stringify({ email: result.email }));
+				setFormState('dashboard');
+			} else {
+				setMessage({ type: 'error', text: result.error || 'No admin linked to this Google account' });
+			}
+		} catch (error: any) {
+			const code = String(error?.code || '');
+			if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+				setMessage(null);
+			} else {
+				setMessage({ type: 'error', text: error?.message || 'Google sign-in failed.' });
+			}
 		} finally {
 			setIsLoading(false);
 		}
@@ -239,7 +273,7 @@ export function AdminPage() {
 									Admin Portal
 								</h1>
 								<p className="text-zinc-400 text-sm">
-									Authenticate to access the WrkSpace admin dashboard.
+									Sign in with email or continue with Google to access the admin dashboard.
 								</p>
 							</div>
 
@@ -298,11 +332,27 @@ export function AdminPage() {
 								<Button 
 									type="submit" 
 									disabled={isLoading}
-									className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:opacity-50 text-white font-medium shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 transition-all duration-200 cursor-pointer"
+									className="w-full h-11 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 disabled:opacity-50 text-white font-medium shadow-md shadow-indigo-600/20 hover:shadow-indigo-600/30 transition-all duration-200 cursor-pointer"
 								>
 									<span>{isLoading ? 'Signing In...' : 'Sign In as Admin'}</span>
 								</Button>
 							</form>
+
+							<div className="relative my-1">
+								<div className="absolute inset-0 flex items-center">
+									<div className="w-full border-t border-zinc-800" />
+								</div>
+								<div className="relative flex justify-center text-[11px] uppercase tracking-widest">
+									<span className="bg-zinc-950 px-3 text-zinc-500 font-mono font-bold">or</span>
+								</div>
+							</div>
+
+							<GoogleSignInButton
+								onClick={handleGoogleLogin}
+								disabled={isLoading}
+								loading={isLoading}
+								label="Continue with Google"
+							/>
 						</div>
 					)}
 

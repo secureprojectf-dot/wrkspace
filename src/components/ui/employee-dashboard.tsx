@@ -38,7 +38,6 @@ import {
 } from '@/app/admin/actions';
 import { MessagesView } from './messages-view';
 import { EmployeeSafetyPanel } from './safety-panel';
-import { EmployeeProfessionalProfileEditor } from './employee-professional-profile';
 import { ProfilePhotoEditor } from './profile-photo';
 
 type EmpTabType = 'overview' | 'tasks' | 'attendance' | 'leaves' | 'messages' | 'events' | 'work_submission' | 'leads' | 'hr_companies' | 'profile' | 'id_card' | 'safety';
@@ -2152,12 +2151,16 @@ export function EmployeeDashboard({ employee, onLogout, onEmployeeUpdate, mobile
 								</div>
 							</div>
 
-							<div className="border-t border-zinc-800 pt-8">
-								<EmployeeProfessionalProfileEditor
-									employee={employee}
-									onEmployeeUpdate={onEmployeeUpdate}
-									compact={Boolean(mobilePanelTab)}
-								/>
+							<div className="rounded-xl border border-brand-500/30 bg-brand-500/5 px-4 py-3 flex items-start gap-2.5">
+								<BriefcaseIcon className="size-4 text-brand-400 mt-0.5 shrink-0" />
+								<p className="text-xs text-zinc-300">
+									Your professional profile (résumé, experience, education, skills, projects &amp;
+									more) is filled in at{' '}
+									<a href="/employee-verification" className="text-brand-400 font-semibold underline">
+										/employee-verification
+									</a>{' '}
+									— sign in there with your employee email &amp; password.
+								</p>
 							</div>
 						</div>
 					</div>

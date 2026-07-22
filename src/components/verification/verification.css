@@ -868,6 +868,82 @@
 	white-space: pre-wrap;
 }
 
+.ev-info-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px 20px;
+}
+
+.ev-info-item {
+	display: grid;
+	gap: 2px;
+}
+
+.ev-info-item span {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.07em;
+	color: var(--ev-muted);
+}
+
+.ev-info-item strong,
+.ev-info-item a {
+	font-size: 13px;
+	font-weight: 600;
+	color: #e2e8f0;
+	word-break: break-word;
+}
+
+.ev-info-item a {
+	color: #8eb0ff;
+	text-decoration: none;
+}
+
+.ev-info-item a:hover {
+	text-decoration: underline;
+}
+
+.ev-skill-group {
+	display: grid;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.ev-skill-group:last-child {
+	margin-bottom: 0;
+}
+
+.ev-skill-group > span {
+	font-size: 10px;
+	text-transform: uppercase;
+	letter-spacing: 0.07em;
+	color: var(--ev-muted);
+}
+
+.ev-tag-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.ev-tag {
+	display: inline-flex;
+	align-items: center;
+	padding: 4px 9px;
+	border-radius: 999px;
+	border: 1px solid rgba(0, 71, 255, 0.35);
+	background: rgba(0, 71, 255, 0.12);
+	color: #cfe0ff;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.ev-subsection + .ev-subsection {
+	margin-top: 14px;
+	padding-top: 14px;
+	border-top: 1px dashed var(--ev-line);
+}
+
 .ev-access-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -962,3 +1038,74 @@
 		color: #0f172a;
 	}
 }
+
+/* --- Login mode toggle (Company/Admin vs Employee) --- */
+.ev-login-mode-toggle {
+	display: flex;
+	gap: 6px;
+	padding: 4px;
+	margin: 14px 0 6px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid var(--ev-line);
+}
+
+.ev-mode-tab {
+	flex: 1;
+	border: 0;
+	cursor: pointer;
+	padding: 9px 10px;
+	border-radius: 9px;
+	font-size: 12.5px;
+	font-weight: 700;
+	background: transparent;
+	color: #94a3b8;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ev-mode-tab.is-active {
+	background: #0047ff;
+	color: white;
+}
+
+/* --- Employment status pill (public/company general-info view) --- */
+.ev-status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 800;
+}
+
+.ev-status-pill.is-active {
+	background: rgba(16, 185, 129, 0.15);
+	color: #34d399;
+	border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.ev-status-pill.is-inactive {
+	background: rgba(244, 63, 94, 0.15);
+	color: #fb7185;
+	border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+.ev-status-pill-sm {
+	margin-left: 6px;
+	padding: 1px 7px;
+	font-size: 9.5px;
+	vertical-align: middle;
+}
+
+/* --- Admin edit-profile tab (SUPER only) --- */
+.ev-admin-edit .ev-chip {
+	cursor: pointer;
+}
+
+.ev-admin-edit .ev-chip.is-active {
+	background: #0047ff;
+	border-color: #0047ff;
+	color: white;
+}
+

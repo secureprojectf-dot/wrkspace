@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 /** Directory of employees for verification reviewers. */
 export async function GET(req: NextRequest) {
 	try {
-		requireVerification(req);
+		const authUser = requireVerification(req);
 		const q = String(req.nextUrl.searchParams.get('q') || '')
 			.trim()
 			.toLowerCase();
@@ -27,10 +27,12 @@ export async function GET(req: NextRequest) {
 				photoUrl: true,
 				createdAt: true,
 				lastLocationAt: true,
+				employmentStatus: true,
 			},
 			orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
 		});
 
+		const isAdmin = authUser.role === 'SUPER';
 		const rows = employees
 			.map((e) => {
 				const name = [e.firstName, e.middleName, e.lastName].filter(Boolean).join(' ').trim();
@@ -45,7 +47,9 @@ export async function GET(req: NextRequest) {
 					gender: e.gender,
 					photoUrl: e.photoUrl,
 					joinedAt: e.createdAt,
-					lastLocationAt: e.lastLocationAt,
+					employmentStatus: e.employmentStatus || 'Active',
+					// Live location is admin-only — outsiders only see general directory info.
+					lastLocationAt: isAdmin ? e.lastLocationAt : null,
 				};
 			})
 			.filter((e) => {

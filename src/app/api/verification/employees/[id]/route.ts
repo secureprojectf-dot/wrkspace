@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { jsonError, requireVerification } from '@/lib/api-auth';
 import { buildEmployeeInsights } from '@/lib/employee-dossier';
-import { profileFromEmployee } from '@/lib/employee-professional-profile';
+import { profileFromEmployee, sanitizeProfessionalProfile, type ProfessionalProfile } from '@/lib/employee-professional-profile';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,7 @@ type Ctx = { params: Promise<{ id: string }> };
 /** Full employee dossier for company / admin verification decisions. */
 export async function GET(req: NextRequest, ctx: Ctx) {
 	try {
-		requireVerification(req);
+		const user = requireVerification(req);
 		const { id } = await ctx.params;
 		const employeeId = String(id || '').trim();
 		if (!employeeId) return jsonError('Employee id required', 400);
@@ -37,6 +37,7 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 				lastLat: true,
 				lastLng: true,
 				lastLocationAt: true,
+				employmentStatus: true,
 				about: true,
 				remarks: true,
 				qualifications: true,
@@ -46,6 +47,26 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 				emergencyContactName: true,
 				emergencyContactPhone: true,
 				emergencyContactRelation: true,
+				professionalTitle: true,
+				city: true,
+				state: true,
+				country: true,
+				linkedinUrl: true,
+				githubUrl: true,
+				portfolioUrl: true,
+				leetcodeUrl: true,
+				codeforcesUrl: true,
+				codechefUrl: true,
+				hackerrankUrl: true,
+				careerObjective: true,
+				yearsOfExperience: true,
+				industry: true,
+				education: true,
+				skills: true,
+				achievements: true,
+				internships: true,
+				publications: true,
+				customSections: true,
 			},
 		});
 		if (!emp) return jsonError('Employee not found', 404);
@@ -128,13 +149,34 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 			return out;
 		};
 
+		const isAdmin = user.role === 'SUPER';
+
+		// Public / company (outsider) viewers only get general, non-sensitive info +
+		// employment status. The full company-facing professional profile (about,
+		// education, skills, experience, projects, certifications, achievements,
+		// internships, publications, custom sections, EC, remarks, live location)
+		// is admin (SUPER) only.
+		const employeeOut = isAdmin
+			? { ...serialize(emp as any), name, tenureDays }
+			: {
+					id: emp.id,
+					name,
+					email: emp.email,
+					phone: emp.phone,
+					wingName: emp.wingName,
+					wingLeadName: emp.wingLeadName,
+					role: emp.role,
+					gender: emp.gender,
+					photoUrl: emp.photoUrl,
+					createdAt: emp.createdAt?.toISOString?.() || emp.createdAt,
+					employmentStatus: emp.employmentStatus || 'Active',
+					tenureDays,
+				};
+
 		return Response.json({
-			employee: {
-				...serialize(emp as any),
-				name,
-				tenureDays,
-			},
-			profile: profileFromEmployee(emp as any),
+			employee: employeeOut,
+			profile: isAdmin ? profileFromEmployee(emp as any) : null,
+			profileRestricted: !isAdmin,
 			insights,
 			summary: {
 				attendanceDays: attendance.length,
@@ -160,6 +202,40 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 			})),
 			safetyTrips: trips.map((t) => serialize(t as any)),
 			at: new Date().toISOString(),
+		});
+	} catch (e: any) {
+		const msg = e.message || 'Unauthorized';
+		return jsonError(msg, msg === 'Unauthorized' ? 401 : 500);
+	}
+}
+
+/** SUPER-only: admins may fill/edit any employee's professional profile, remarks & employment status. */
+export async function PATCH(req: NextRequest, ctx: Ctx) {
+	try {
+		const user = requireVerification(req);
+		if (user.role !== 'SUPER') return jsonError('Admin access required', 403);
+		const { id } = await ctx.params;
+		const employeeId = String(id || '').trim();
+		if (!employeeId) return jsonError('Employee id required', 400);
+
+		const body = (await req.json().catch(() => ({}))) as Partial<ProfessionalProfile> & {
+			employmentStatus?: string;
+		};
+
+		const data: Record<string, unknown> = sanitizeProfessionalProfile(body);
+		if (body.employmentStatus !== undefined) {
+			const status = String(body.employmentStatus).trim();
+			if (status !== 'Active' && status !== 'Inactive') {
+				return jsonError('employmentStatus must be Active or Inactive', 400);
+			}
+			data.employmentStatus = status;
+		}
+
+		const employee = await db.employee.update({ where: { id: employeeId }, data });
+		return Response.json({
+			ok: true,
+			employee,
+			profile: profileFromEmployee(employee as any),
 		});
 	} catch (e: any) {
 		const msg = e.message || 'Unauthorized';

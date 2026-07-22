@@ -2,8 +2,8 @@ import { db } from '@/lib/db';
 import { notifyPush } from '@/lib/push-notify';
 import { emitAttendanceUpdate } from '@/lib/realtime-emit';
 
-const DAY_CHECKOUT_LABEL = '06:30 PM';
-const DAY_CHECKOUT_MINUTES = 18 * 60 + 30;
+const DAY_CHECKOUT_LABEL = '07:00 PM';
+const DAY_CHECKOUT_MINUTES = 19 * 60; // 7:00 PM IST
 const LATE_START_MINUTES = 21 * 60 + 30; // 9:30 PM IST
 const FORCE_CLOSE_MINUTES = 24 * 60; // midnight → force previous/today leftovers
 /** Minutes before day cutoff to send reminder. */
@@ -51,7 +51,7 @@ function formatMinsLabel(mins: number) {
 
 /**
  * Checkout policy:
- * - Day shift (check-in before 6:30 PM) → auto out at 6:30 PM
+ * - Day shift (check-in before 7:00 PM) → auto out at 7:00 PM
  * - Still open after 9:30 PM → auto out (and every hour until midnight for late check-ins)
  * - At/after midnight → force-close any leftover open session
  */
@@ -81,9 +81,9 @@ export function checkoutDecisionForLog(
 		};
 	}
 
-	// Day shift cutoff 6:30 PM (skip if they only checked in after 6:30)
+	// Day shift cutoff 7:00 PM (skip if they only checked in after 7:00)
 	if (!eveningCheckIn && nowMins >= DAY_CHECKOUT_MINUTES) {
-		return { shouldClose: true, label: DAY_CHECKOUT_LABEL, reason: 'day_630' };
+		return { shouldClose: true, label: DAY_CHECKOUT_LABEL, reason: 'day_700' };
 	}
 
 	return null;
@@ -152,7 +152,7 @@ export async function processAttendanceCheckoutJobs(opts?: { notify?: boolean })
 			continue;
 		}
 
-		// Near 6:30 PM reminder for day-shift open sessions
+		// Near 7:00 PM reminder for day-shift open sessions
 		const checkInMins = parseTimeLabelToMinutes(log.checkIn);
 		const eveningCheckIn = checkInMins != null && checkInMins >= DAY_CHECKOUT_MINUTES;
 		const remindAt = DAY_CHECKOUT_MINUTES - REMINDER_LEAD_MINUTES;

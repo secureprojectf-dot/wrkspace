@@ -1320,7 +1320,7 @@ function getISTDateAndTime() {
 
 export async function runAutoCheckOut() {
   try {
-    // Closes shifts past 06:30 / 09:30 PM IST and sends FCM (reminder handled by cron).
+    // Closes shifts past 07:00 / 09:30 PM IST and sends FCM (reminder handled by cron).
     const result = await processAttendanceCheckoutJobs({ notify: true });
     if (result.autoCheckedOut || result.reminded) {
       console.log('[runAutoCheckOut]', result);

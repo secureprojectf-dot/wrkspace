@@ -384,6 +384,7 @@ export function AuthPage() {
 				<div className="z-10 flex items-center gap-2">
 					<img src="/branding/wrkspace-logo-on-dark.png?v=20260717" alt="wrkspace" className="h-10 w-auto object-contain" />
 				</div>
+				<LoginAccessAnimation />
 				<div className="z-10 mt-auto">
 					<blockquote className="space-y-3">
 						<p className="text-xl text-zinc-100 font-light leading-relaxed">
@@ -767,6 +768,73 @@ export function AuthPage() {
 }
 
 // ─── BACKGROUND VECTOR PATHS (LEFT PANEL) ───
+function LoginAccessAnimation() {
+	return (
+		<div className="z-10 flex flex-1 items-center justify-center py-8">
+			<div className="relative">
+				{/* Ambient glow */}
+				<motion.div
+					className="absolute -inset-8 rounded-full bg-brand-500/10 blur-2xl"
+					animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.9, 0.5] }}
+					transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+				/>
+
+				{/* Secure sign-in card */}
+				<motion.div
+					className="relative w-60 rounded-2xl border border-zinc-700/60 bg-zinc-900/80 p-5 shadow-2xl backdrop-blur"
+					animate={{ y: [-6, 6, -6] }}
+					transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+				>
+					<div className="flex items-center gap-3">
+						<motion.div
+							className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-600/20 text-brand-400"
+							animate={{ scale: [1, 1.15, 1] }}
+							transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+						>
+							<LockIcon className="size-4" />
+						</motion.div>
+						<div>
+							<p className="text-xs font-semibold text-zinc-200">Secure sign-in</p>
+							<p className="text-[10px] text-zinc-500">Encrypted session</p>
+						</div>
+					</div>
+					<div className="mt-4 space-y-2">
+						<div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+							<motion.div
+								className="h-1.5 rounded-full bg-brand-500"
+								animate={{ width: ['10%', '90%', '10%'] }}
+								transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+							/>
+						</div>
+						<div className="h-1.5 w-3/5 rounded-full bg-zinc-800" />
+					</div>
+				</motion.div>
+
+				{/* Floating "access verified" badge */}
+				<motion.div
+					className="absolute -bottom-5 -right-6 flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-zinc-900/90 px-3 py-1.5 shadow-xl"
+					animate={{ opacity: [0, 1, 1, 0], y: [8, 0, 0, -6] }}
+					transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.25, 0.8, 1] }}
+				>
+					<CheckCircle2Icon className="size-3.5 text-emerald-400" />
+					<span className="text-[10px] font-semibold text-emerald-300">Access verified</span>
+				</motion.div>
+
+				{/* Floating particles */}
+				{[0, 1, 2].map((i) => (
+					<motion.span
+						key={i}
+						className="absolute size-1.5 rounded-full bg-brand-400/70"
+						style={{ left: `${20 + i * 30}%`, top: `${-6 - i * 6}%` }}
+						animate={{ y: [0, -14, 0], opacity: [0.3, 1, 0.3] }}
+						transition={{ duration: 2.4 + i * 0.6, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}
+					/>
+				))}
+			</div>
+		</div>
+	);
+}
+
 function FloatingPaths({ position }: { position: number }) {
 	const paths = Array.from({ length: 36 }, (_, i) => ({
 		id: i,

@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
         wingLeadName: emp.wingLeadName,
         role: emp.role,
         phone: emp.phone,
+        photoUrl: emp.photoUrl ?? null,
+        gender: emp.gender ?? 'UNSPECIFIED',
       },
     });
   } catch (e: any) {
