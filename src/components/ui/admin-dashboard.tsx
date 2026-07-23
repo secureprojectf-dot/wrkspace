@@ -17,17 +17,21 @@ import {
 	UserPlusIcon,
 	PlusIcon,
 } from 'lucide-react';
-import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents, getHrCompanies, createHrCompany, updateHrCompany, deleteHrCompany, triggerHrCompaniesCrawl, allowHrCompany, allowAllHrCompanies, deleteAllCrawledHrCompanies, bulkImportEmployees, getTeamLeads, allocateTeamLead, updateTeamLead, deleteTeamLead, getEmployeeByEmail } from '@/app/admin/actions';
+import { getLiveSystemStats, addEmployee, getEmployees, createTask, getTasks, getAllLeaves, updateLeaveStatus, getAllAttendance, createEvent, getEvents, getWorkSubmissions, updateSubmissionStatus, getLeads, updateLeadStatus, assignLead, deleteLead, bulkImportLeads, allowLead, triggerCrawl, allowAllLeads, deleteAllLeads, createManualLead, getAdminProfile, allocateAdmin, getAllAdmins, deleteAdmin, deleteEmployee, updateEmployee, updateEmployeeIdCard, deleteTask, updateTask, deleteLeave, createLeave, deleteAttendance, createAttendance, updateAttendance, deleteEvent, updateEvent, deleteWorkSubmission, triggerEventsCrawl, allowEvent, allowAllEvents, deleteAllCrawledEvents, getHrCompanies, createHrCompany, updateHrCompany, deleteHrCompany, triggerHrCompaniesCrawl, allowHrCompany, allowAllHrCompanies, deleteAllCrawledHrCompanies, bulkImportEmployees, getTeamLeads, allocateTeamLead, updateTeamLead, deleteTeamLead, getEmployeeByEmail, allowEmployeeHomeSetup } from '@/app/admin/actions';
+import { AdminLiveSafetyPanel } from './safety-panel';
+import { AdminLiveTrackingPanel } from './live-tracking-panel';
+import OfficesPanel from '@/components/ui/offices-panel';
 import { CalendarIcon, MapPinIcon, FileTextIcon, CheckCircleIcon, XCircleIcon, ClockIcon, AlertCircleIcon, BarChart2Icon, UploadIcon, Trash2Icon, UserCheckIcon, PencilIcon, CheckIcon, XIcon, EyeIcon, CopyIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MessagesView } from './messages-view';
+import { ChatAvatar } from './chat-avatar';
 
 interface AdminDashboardProps {
 	email: string;
 	onLogout: () => void;
 }
 
-type TabType = 'overview' | 'employees' | 'leaves' | 'attendance' | 'clients' | 'system_status' | 'messages' | 'task_allocation' | 'events' | 'work_submissions' | 'leads' | 'hr_companies' | 'super_admin' | 'team_leads';
+type TabType = 'overview' | 'employees' | 'leaves' | 'attendance' | 'offices' | 'clients' | 'system_status' | 'messages' | 'task_allocation' | 'events' | 'work_submissions' | 'leads' | 'hr_companies' | 'super_admin' | 'team_leads' | 'live_safety' | 'live_tracking';
 
 export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [activeTab, setActiveTab] = useState<TabType>('overview');
@@ -39,7 +43,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [newAdminOrgName, setNewAdminOrgName] = useState('');
 	const [newAdminPassword, setNewAdminPassword] = useState('admin123');
 	const [newAdminPages, setNewAdminPages] = useState<string[]>([
-		'overview', 'employees', 'task_allocation', 'attendance', 'leaves', 'clients', 'messages', 'system_status', 'events', 'work_submissions', 'leads', 'hr_companies'
+		'overview', 'employees', 'task_allocation', 'attendance', 'offices', 'leaves', 'clients', 'messages', 'system_status', 'events', 'work_submissions', 'leads', 'hr_companies'
 	]);
 	const [allocatedLink, setAllocatedLink] = useState<string | null>(null);
 	const [isAllocating, setIsAllocating] = useState(false);
@@ -264,6 +268,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 	const [wingName, setWingName] = useState('');
 	const [wingLeadName, setWingLeadName] = useState('');
 	const [empRole, setEmpRole] = useState('Employee');
+	const [empGender, setEmpGender] = useState('UNSPECIFIED');
 
 	const [addMessage, setAddMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 	const [isAdding, setIsAdding] = useState(false);
@@ -995,6 +1000,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 				wingName,
 				wingLeadName,
 				role: empRole,
+				gender: empGender,
 			});
 
 			if (result.success && result.employee) {
@@ -1011,6 +1017,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 				setWingName('');
 				setWingLeadName('');
 				setEmpRole('Employee');
+				setEmpGender('UNSPECIFIED');
 
 				// Refresh list
 				await fetchEmployees();
@@ -1435,7 +1442,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 			<header className="w-full border-b border-zinc-900 bg-zinc-950 sticky top-0 z-50 shadow-md shadow-black/40">
 				<div className="w-full px-6 md:px-10 h-20 flex items-center justify-between">
 					<div className="flex items-center gap-4">
-						<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-8 w-auto object-contain" />
+						<img src="/branding/wrkspace-logo-on-dark.png" alt="wrkspace" className="h-9 w-auto object-contain" />
 						<div className="w-px h-6 bg-zinc-800" />
 						<span className="text-sm font-semibold tracking-wider text-zinc-400 uppercase font-mono">Admin</span>
 					</div>
@@ -1489,6 +1496,24 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							Overview
 						</button>
 					)}
+					<button
+						onClick={() => setActiveTab('live_safety')}
+						className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'live_safety' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
+					>
+						Live safety
+					</button>
+					<button
+						onClick={() => setActiveTab('live_tracking')}
+						className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'live_tracking' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
+					>
+						Live tracking
+					</button>
+					<a
+						href="/employee-verification"
+						className="py-3 border-b-2 border-transparent text-brand-300/60 hover:text-white transition-all cursor-pointer whitespace-nowrap"
+					>
+						Employee verification ↗
+					</a>
 					{(isSuperAdmin || allowedTabs.includes('employees')) && (
 						<button
 							onClick={() => setActiveTab('employees')}
@@ -1514,6 +1539,14 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'attendance' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
 						>
 							Attendance
+						</button>
+					)}
+					{(isSuperAdmin || allowedTabs.includes('offices')) && (
+						<button
+							onClick={() => setActiveTab('offices')}
+							className={`py-3 border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeTab === 'offices' ? 'border-brand-400 text-white font-semibold' : 'border-transparent text-brand-300/60 hover:text-white'}`}
+						>
+							Offices & QR
 						</button>
 					)}
 					{(isSuperAdmin || allowedTabs.includes('leaves')) && (
@@ -1609,6 +1642,9 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 			)}>
 
 				{/* Tab content: Overview */}
+				{activeTab === 'live_safety' && <AdminLiveSafetyPanel adminEmail={email} />}
+				{activeTab === 'live_tracking' && <AdminLiveTrackingPanel adminEmail={email} />}
+
 				{activeTab === 'overview' && (
 					<div className="space-y-6">
 						{/* Stats Grid */}
@@ -1893,6 +1929,12 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 					</div>
 				)}
 
+				{activeTab === 'offices' && (
+					<div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none">
+						<OfficesPanel />
+					</div>
+				)}
+
 				{/* Tab content: Attendance Logs */}
 				{activeTab === 'attendance' && (() => {
 					const { presentList, absentList, onLeaveList } = getTodayAttendanceSummary();
@@ -1983,7 +2025,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										</div>
 										<div className="space-y-1">
 											<label className="text-[10px] text-zinc-400 uppercase font-medium">Check-Out Time (Optional)</label>
-											<Input type="text" name="checkOut" placeholder="e.g. 06:30 PM" className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
+											<Input type="text" name="checkOut" placeholder="e.g. 07:00 PM / 09:30 PM" className="bg-zinc-950 border-zinc-800 text-white text-xs rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-700" />
 										</div>
 									</div>
 									<Button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold py-2 px-4 rounded-none cursor-pointer">
@@ -2260,6 +2302,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 							email: email,
 							role: 'Admin'
 						}}
+						adminEmail={email}
 					/>
 				)}
 
@@ -2680,7 +2723,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 									</div>
 								</div>
 
-								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 									<div className="space-y-1">
 										<label className="text-[10px] text-zinc-400 uppercase font-medium">Wing Name</label>
 										<Input
@@ -2711,6 +2754,18 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 											onChange={e => setEmpRole(e.target.value)}
 										/>
 									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Gender</label>
+										<select
+											className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 focus:outline-none focus:border-zinc-700"
+											value={empGender}
+											onChange={e => setEmpGender(e.target.value)}
+										>
+											<option value="UNSPECIFIED">Not set (employee chooses)</option>
+											<option value="FEMALE">Female</option>
+											<option value="MALE">Male</option>
+										</select>
+									</div>
 								</div>
 
 								<Button
@@ -2729,19 +2784,21 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 								<thead className="bg-zinc-950/70 border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-wider">
 									<tr>
 										<th className="p-4 font-semibold w-44">Employee ID</th>
+										<th className="p-4 font-semibold w-20">Photo</th>
 										<th className="p-4 font-semibold w-72">Full Name</th>
 										<th className="p-4 font-semibold w-96">Email ID</th>
 										<th className="p-4 font-semibold w-56">Phone</th>
 										<th className="p-4 font-semibold w-56">Wing</th>
 										<th className="p-4 font-semibold w-64">Wing Lead</th>
 										<th className="p-4 font-semibold w-64">Role</th>
+										<th className="p-4 font-semibold w-40">Gender</th>
 										<th className="p-4 font-semibold text-right w-32">Actions</th>
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-zinc-850 bg-zinc-950/10">
 									{employeesList.length === 0 ? (
 										<tr>
-											<td colSpan={8} className="p-8 text-center text-zinc-550 text-xs italic font-sans">
+											<td colSpan={10} className="p-8 text-center text-zinc-550 text-xs italic font-sans">
 												No employees registered in directory. Click "Add New Employee" to get started.
 											</td>
 										</tr>
@@ -2749,6 +2806,25 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										employeesList.map((emp) => (
 											<tr key={emp.id} className="hover:bg-zinc-900/30 transition-colors">
 												<td className="p-4 font-semibold text-indigo-400">{emp.id}</td>
+												<td className="p-4">
+													<div className="flex flex-col items-start gap-1">
+														<ChatAvatar
+															id={emp.id}
+															name={`${emp.firstName} ${emp.lastName}`}
+															hasPhoto={Boolean(emp.hasPhoto)}
+															adminEmail={email}
+															size={36}
+														/>
+														<span
+															className={cn(
+																'text-[9px] font-bold uppercase tracking-wide',
+																emp.hasPhoto ? 'text-emerald-400' : 'text-zinc-500',
+															)}
+														>
+															{emp.hasPhoto ? 'Has photo' : 'No photo'}
+														</span>
+													</div>
+												</td>
 												<td className="p-4 text-white font-sans font-medium">
 													{emp.firstName} {emp.middleName ? `${emp.middleName} ` : ''}{emp.lastName}
 												</td>
@@ -2757,8 +2833,35 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 												<td className="p-4 text-zinc-200">{emp.wingName}</td>
 												<td className="p-4 text-zinc-200">{emp.wingLeadName}</td>
 												<td className="p-4 text-zinc-200">{emp.role || 'Employee'}</td>
+												<td className="p-4 text-zinc-200">
+													{String(emp.gender || 'UNSPECIFIED').toUpperCase() === 'FEMALE'
+														? 'Female'
+														: String(emp.gender || '').toUpperCase() === 'MALE'
+															? 'Male'
+															: 'Not set'}
+												</td>
 												<td className="p-4 text-right">
-													<div className="inline-flex items-center justify-end gap-2">
+													<div className="inline-flex items-center justify-end gap-2 flex-wrap">
+														{String(emp.gender || '').toUpperCase() === 'FEMALE' && (
+															<button
+																type="button"
+																onClick={async () => {
+																	const res = await allowEmployeeHomeSetup(emp.id);
+																	if (res.success) {
+																		alert(
+																			`Home setup allowed for ${emp.firstName}. They will see the yellow banner on Safety and can set/update home once.`
+																		);
+																		fetchEmployees();
+																	} else {
+																		alert(res.error || 'Failed');
+																	}
+																}}
+																className="px-2 py-1 text-[10px] font-bold uppercase tracking-wide bg-amber-400 text-amber-950 border border-amber-500 hover:bg-amber-300 cursor-pointer"
+																title="Allow employee to set/change home location once"
+															>
+																Allow home setup
+															</button>
+														)}
 														<button
 															onClick={() => {
 																setEditingItem(emp);
@@ -4915,7 +5018,8 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										phone: formData.get('phone') as string,
 										wingName: formData.get('wingName') as string,
 										wingLeadName: formData.get('wingLeadName') as string,
-										role: formData.get('role') as string
+										role: formData.get('role') as string,
+										gender: formData.get('gender') as string,
 									});
 								}}
 								className="space-y-4"
@@ -4944,7 +5048,7 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										<Input name="phone" defaultValue={editingItem.phone} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
 									</div>
 								</div>
-								<div className="grid grid-cols-3 gap-2">
+								<div className="grid grid-cols-2 gap-2">
 									<div className="space-y-1">
 										<label className="text-[10px] text-zinc-400 uppercase font-medium">Wing Name</label>
 										<Input name="wingName" defaultValue={editingItem.wingName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
@@ -4953,9 +5057,87 @@ export function AdminDashboard({ email, onLogout }: AdminDashboardProps) {
 										<label className="text-[10px] text-zinc-400 uppercase font-medium">Wing Lead</label>
 										<Input name="wingLeadName" defaultValue={editingItem.wingLeadName} required className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
 									</div>
+								</div>
+								<div className="grid grid-cols-2 gap-2">
 									<div className="space-y-1">
 										<label className="text-[10px] text-zinc-400 uppercase font-medium">Role</label>
 										<Input name="role" defaultValue={editingItem.role || ''} className="bg-zinc-950 border-zinc-800 text-xs text-white rounded-none h-9 focus-visible:ring-0 focus-visible:border-zinc-750" />
+									</div>
+									<div className="space-y-1">
+										<label className="text-[10px] text-zinc-400 uppercase font-medium">Gender</label>
+										<select
+											name="gender"
+											defaultValue={String(editingItem.gender || 'UNSPECIFIED').toUpperCase()}
+											className="w-full bg-zinc-950 border border-zinc-800 text-white text-xs rounded-none h-9 px-2 focus:outline-none focus:border-zinc-700"
+										>
+											<option value="UNSPECIFIED">Not set (employee chooses)</option>
+											<option value="FEMALE">Female</option>
+											<option value="MALE">Male</option>
+										</select>
+									</div>
+								</div>
+								<div className="space-y-2 pt-2 border-t border-zinc-800">
+									<label className="text-[10px] text-zinc-400 uppercase font-medium">Employee ID card</label>
+									<p className="text-[11px] text-zinc-500">Upload the complete ID card image. Employee will see it in Mobile More → ID card and Website ID card tab.</p>
+									{editingItem.idCardUrl ? (
+										// eslint-disable-next-line @next/next/no-img-element
+										<img src={editingItem.idCardUrl} alt="ID card" className="w-full max-h-40 object-contain border border-zinc-800 bg-zinc-950" />
+									) : (
+										<div className="text-[11px] text-zinc-600 border border-dashed border-zinc-800 p-3">No ID card uploaded yet</div>
+									)}
+									<div className="flex flex-wrap gap-2">
+										<label className="inline-flex items-center gap-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 px-3 py-2 cursor-pointer">
+											Upload ID card
+											<input
+												type="file"
+												accept="image/*"
+												className="hidden"
+												onChange={async (e) => {
+													const file = e.target.files?.[0];
+													e.target.value = '';
+													if (!file) return;
+													try {
+														const dataUrl = await new Promise<string>((resolve, reject) => {
+															const reader = new FileReader();
+															reader.onload = () => resolve(String(reader.result || ''));
+															reader.onerror = reject;
+															reader.readAsDataURL(file);
+														});
+														if (dataUrl.length > 900_000) {
+															alert('Image too large — use a smaller photo of the ID card');
+															return;
+														}
+														const res = await updateEmployeeIdCard(editingItem.id, dataUrl);
+														if (res.success && res.employee) {
+															setEditingItem(res.employee);
+															fetchEmployees();
+															alert('ID card uploaded');
+														} else {
+															alert(res.error || 'Upload failed');
+														}
+													} catch {
+														alert('Could not read image');
+													}
+												}}
+											/>
+										</label>
+										{editingItem.idCardUrl && (
+											<button
+												type="button"
+												className="text-xs font-semibold text-red-300 border border-red-900 px-3 py-2 hover:bg-red-950/40 cursor-pointer"
+												onClick={async () => {
+													const res = await updateEmployeeIdCard(editingItem.id, null);
+													if (res.success && res.employee) {
+														setEditingItem(res.employee);
+														fetchEmployees();
+													} else {
+														alert(res.error || 'Remove failed');
+													}
+												}}
+											>
+												Remove ID card
+											</button>
+										)}
 									</div>
 								</div>
 								<div className="flex justify-end gap-2 pt-2 border-t border-zinc-800">

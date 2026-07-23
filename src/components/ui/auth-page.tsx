@@ -1,9 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from './button';
-import { EmployeeDashboard } from './employee-dashboard';
+import { useIsMobile } from '@/hooks/use-is-mobile';
+import { SoftErrorBoundary } from '@/components/soft-error-boundary';
+import { importWithRetry } from '@/lib/import-with-retry';
 
 import {
 	AtSignIcon,
@@ -20,10 +23,99 @@ import {
 import { Input } from './input';
 import { cn } from '@/lib/utils';
 import { 
-	loginEmployee, 
+	loginEmployee,
+	loginEmployeeWithGoogle,
 	sendEmployeeOtp, 
-	verifyEmployeeOtpAndResetPassword
+	verifyEmployeeOtpAndResetPassword,
+	setEmployeeGender,
 } from '@/app/admin/actions';
+import { firebaseAuth, googleProvider } from '@/lib/firebase-client';
+import { signInWithPopup } from 'firebase/auth';
+import { GoogleSignInButton } from './google-sign-in-button';
+
+const MobileAppShell = dynamic(
+	() =>
+		importWithRetry(() =>
+			import('@/components/mobile/mobile-app-shell').then((m) => {
+				if (!m?.MobileAppShell) throw new Error('MobileAppShell export missing');
+				return m.MobileAppShell;
+			}),
+		),
+	{ ssr: false, loading: () => <ShellLoading /> },
+);
+
+const EmployeeDashboard = dynamic(
+	() =>
+		importWithRetry(() =>
+			import('./employee-dashboard').then((m) => {
+				if (!m?.EmployeeDashboard) throw new Error('EmployeeDashboard export missing');
+				return m.EmployeeDashboard;
+			}),
+		),
+	{ ssr: false, loading: () => <ShellLoading /> },
+);
+
+function ShellLoading() {
+	return (
+		<div className="flex min-h-screen items-center justify-center bg-[#F0F3FF] text-[#0F172A]">
+			<div className="size-8 animate-spin rounded-full border-2 border-[#0047FF] border-t-transparent" />
+		</div>
+	);
+}
+
+function EmployeeShell({
+	employee,
+	onLogout,
+	onEmployeeUpdate,
+}: {
+	employee: any;
+	onLogout: () => void;
+	onEmployeeUpdate: (next: any) => void;
+}) {
+	const isMobile = useIsMobile();
+
+	// Warm the mobile shell chunk while login is visible / spinner shows
+	useEffect(() => {
+		if (isMobile !== true) return;
+		void import('@/components/mobile/mobile-app-shell').catch(() => {});
+	}, [isMobile]);
+
+	// Desktop also needs FCM for chat / tasks / SOS (mobile shell registers itself).
+	useEffect(() => {
+		if (isMobile !== false || !employee?.id) return;
+		const t = window.setTimeout(() => {
+			void import('@/lib/web-push').then((m) => m.registerWebPush(employee.id));
+		}, 2500);
+		return () => window.clearTimeout(t);
+	}, [isMobile, employee?.id]);
+
+	if (isMobile === null) return <ShellLoading />;
+
+	if (isMobile) {
+		return (
+			<SoftErrorBoundary>
+				<Suspense fallback={<ShellLoading />}>
+					<MobileAppShell
+						employee={employee}
+						onLogout={onLogout}
+						onEmployeeUpdate={onEmployeeUpdate}
+					/>
+				</Suspense>
+			</SoftErrorBoundary>
+		);
+	}
+	return (
+		<SoftErrorBoundary>
+			<Suspense fallback={<ShellLoading />}>
+				<EmployeeDashboard
+					employee={employee}
+					onLogout={onLogout}
+					onEmployeeUpdate={onEmployeeUpdate}
+				/>
+			</Suspense>
+		</SoftErrorBoundary>
+	);
+}
 
 type ViewType = 'login' | 'forgot' | 'forgot_verify' | 'forgot_sent';
 
@@ -38,18 +130,32 @@ export function AuthPage() {
 	const [loggedInEmployee, setLoggedInEmployee] = useState<any>(null);
 	const [sessionRestored, setSessionRestored] = useState(false);
 
-	// Restore session from localStorage on mount
+	// Restore session from localStorage, then refresh from Neon (home/gender stay in sync)
 	useEffect(() => {
-		try {
-			const saved = localStorage.getItem('wrkspace_employee_session');
-			if (saved) {
-				setLoggedInEmployee(JSON.parse(saved));
+		(async () => {
+			try {
+				const saved = localStorage.getItem('wrkspace_employee_session');
+				if (saved) {
+					const parsed = JSON.parse(saved);
+					setLoggedInEmployee(parsed);
+					const { refreshEmployeeSession } = await import('@/app/admin/actions');
+					const res = await refreshEmployeeSession(parsed.id);
+					if (res.success && res.employee) {
+						const existingToken =
+							localStorage.getItem('wrkspace_employee_token') ||
+							String((parsed as { token?: string }).token || '');
+						const next = existingToken ? { ...res.employee, token: existingToken } : res.employee;
+						localStorage.setItem('wrkspace_employee_session', JSON.stringify(next));
+						if (existingToken) localStorage.setItem('wrkspace_employee_token', existingToken);
+						setLoggedInEmployee(next);
+					}
+				}
+			} catch {
+				localStorage.removeItem('wrkspace_employee_session');
+			} finally {
+				setSessionRestored(true);
 			}
-		} catch (e) {
-			localStorage.removeItem('wrkspace_employee_session');
-		} finally {
-			setSessionRestored(true);
-		}
+		})();
 	}, []);
 
 	// Forgot password state
@@ -74,13 +180,51 @@ export function AuthPage() {
 		try {
 			const result = await loginEmployee(email, password);
 			if (result.success && result.employee) {
-				localStorage.setItem('wrkspace_employee_session', JSON.stringify(result.employee));
-				setLoggedInEmployee(result.employee);
+				const session = { ...result.employee, token: (result as any).token };
+				localStorage.setItem('wrkspace_employee_session', JSON.stringify(session));
+				if ((result as any).token) localStorage.setItem('wrkspace_employee_token', (result as any).token);
+				setLoggedInEmployee(session);
 			} else {
 				setMessage({ type: 'error', text: result.error || 'Authentication failed' });
 			}
 		} catch (error) {
 			setMessage({ type: 'error', text: 'An unexpected system error occurred.' });
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleGoogleLogin = async () => {
+		if (isLoading) return;
+		if (!firebaseAuth) {
+			setMessage({ type: 'error', text: 'Google sign-in is not configured on this deployment.' });
+			return;
+		}
+		setIsLoading(true);
+		setMessage(null);
+		try {
+			const cred = await signInWithPopup(firebaseAuth, googleProvider);
+			const googleEmail = cred.user?.email;
+			if (!googleEmail) {
+				setMessage({ type: 'error', text: 'Google sign-in did not return an email.' });
+				return;
+			}
+			const result = await loginEmployeeWithGoogle(googleEmail);
+			if (result.success && result.employee) {
+				const session = { ...result.employee, token: (result as any).token };
+				localStorage.setItem('wrkspace_employee_session', JSON.stringify(session));
+				if ((result as any).token) localStorage.setItem('wrkspace_employee_token', (result as any).token);
+				setLoggedInEmployee(session);
+			} else {
+				setMessage({ type: 'error', text: result.error || 'No employee linked to this Google account' });
+			}
+		} catch (error: any) {
+			const code = String(error?.code || '');
+			if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+				setMessage(null);
+			} else {
+				setMessage({ type: 'error', text: error?.message || 'Google sign-in failed.' });
+			}
 		} finally {
 			setIsLoading(false);
 		}
@@ -161,12 +305,68 @@ export function AuthPage() {
 	// Wait for session restore before rendering to avoid flash
 	if (!sessionRestored) return null;
 
+	// ─── GENDER GATE ───
+	const gender = String(loggedInEmployee?.gender || 'UNSPECIFIED').toUpperCase();
+	const needsGender = loggedInEmployee && (!gender || gender === 'UNSPECIFIED');
+
+	if (loggedInEmployee && needsGender) {
+		const pick = async (g: 'MALE' | 'FEMALE') => {
+			const res = await setEmployeeGender(loggedInEmployee.id, g);
+			if (res.success && res.employee) {
+				localStorage.setItem('wrkspace_employee_session', JSON.stringify(res.employee));
+				setLoggedInEmployee(res.employee);
+			} else {
+				setMessage({ type: 'error', text: res.error || 'Could not save gender' });
+			}
+		};
+		return (
+			<main className="min-h-screen bg-[#e8edf5] flex items-center justify-center p-6 font-sans">
+				<div className="w-full max-w-md bg-white border border-slate-300 shadow-lg p-8 space-y-5">
+					<h1 className="text-xl font-black text-slate-900">Select your gender</h1>
+					<p className="text-sm text-slate-600 leading-relaxed">
+						Required once for workplace safety settings. Girl Safety and SOS are available only for female employees.
+					</p>
+					{message?.type === 'error' && (
+						<p className="text-sm text-red-600 font-semibold">{message.text}</p>
+					)}
+					<div className="grid grid-cols-2 gap-3 pt-2">
+						<button
+							type="button"
+							onClick={() => pick('FEMALE')}
+							className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-3 px-4"
+						>
+							Female
+						</button>
+						<button
+							type="button"
+							onClick={() => pick('MALE')}
+							className="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4"
+						>
+							Male
+						</button>
+					</div>
+					<button type="button" onClick={handleLogout} className="text-sm text-slate-500 underline">
+						Sign out
+					</button>
+				</div>
+			</main>
+		);
+	}
+
 	// ─── EMPLOYEE DASHBOARD VIEW ───
 	if (loggedInEmployee) {
 		return (
-			<EmployeeDashboard 
-				employee={loggedInEmployee} 
-				onLogout={handleLogout} 
+			<EmployeeShell
+				employee={loggedInEmployee}
+				onLogout={handleLogout}
+				onEmployeeUpdate={(next) => {
+					setLoggedInEmployee(next);
+					try {
+						localStorage.setItem('wrkspace_employee_session', JSON.stringify(next));
+					} catch {
+						/* ignore */
+					}
+				}}
 			/>
 		);
 	}
@@ -182,8 +382,9 @@ export function AuthPage() {
 				<div className="from-zinc-950 absolute inset-0 z-10 bg-gradient-to-t to-transparent opacity-40" />
 
 				<div className="z-10 flex items-center gap-2">
-					<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-10 w-auto object-contain" />
+					<img src="/branding/wrkspace-logo-on-dark.png?v=20260717" alt="wrkspace" className="h-10 w-auto object-contain" />
 				</div>
+				<LoginAccessAnimation />
 				<div className="z-10 mt-auto">
 					<blockquote className="space-y-3">
 						<p className="text-xl text-zinc-100 font-light leading-relaxed">
@@ -220,9 +421,9 @@ export function AuthPage() {
 								className="space-y-6"
 							>
 								<div className="flex flex-col space-y-2">
-									<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-10 w-auto object-contain self-start mb-2" />
+									<img src="/branding/wrkspace-logo-on-dark.png?v=20260717" alt="wrkspace" className="h-10 w-auto object-contain self-start mb-2" />
 									<p className="text-zinc-400 text-sm leading-relaxed font-medium">
-										Employee Portal directory console. Sign in below using your enterprise coordinates.
+										Employee Portal directory console. Sign in with email or continue with Google.
 									</p>
 								</div>
 
@@ -296,6 +497,23 @@ export function AuthPage() {
 										<span>{isLoading ? 'Processing...' : 'Continue With Email'}</span>
 									</Button>
 								</form>
+
+								<div className="relative my-5">
+									<div className="absolute inset-0 flex items-center">
+										<div className="w-full border-t border-zinc-800" />
+									</div>
+									<div className="relative flex justify-center text-[11px] uppercase tracking-widest">
+										<span className="bg-zinc-950 px-3 text-zinc-500 font-mono font-bold">or</span>
+									</div>
+								</div>
+
+								<GoogleSignInButton
+									onClick={handleGoogleLogin}
+									disabled={isLoading}
+									loading={isLoading}
+									label="Continue with Google"
+								/>
+
 								<p className="text-zinc-555 mt-8 text-xs leading-relaxed">
 									By clicking continue, you agree to our{' '}
 									<a
@@ -550,6 +768,73 @@ export function AuthPage() {
 }
 
 // ─── BACKGROUND VECTOR PATHS (LEFT PANEL) ───
+function LoginAccessAnimation() {
+	return (
+		<div className="z-10 flex flex-1 items-center justify-center py-8">
+			<div className="relative">
+				{/* Ambient glow */}
+				<motion.div
+					className="absolute -inset-8 rounded-full bg-brand-500/10 blur-2xl"
+					animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.9, 0.5] }}
+					transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+				/>
+
+				{/* Secure sign-in card */}
+				<motion.div
+					className="relative w-60 rounded-2xl border border-zinc-700/60 bg-zinc-900/80 p-5 shadow-2xl backdrop-blur"
+					animate={{ y: [-6, 6, -6] }}
+					transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
+				>
+					<div className="flex items-center gap-3">
+						<motion.div
+							className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-600/20 text-brand-400"
+							animate={{ scale: [1, 1.15, 1] }}
+							transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+						>
+							<LockIcon className="size-4" />
+						</motion.div>
+						<div>
+							<p className="text-xs font-semibold text-zinc-200">Secure sign-in</p>
+							<p className="text-[10px] text-zinc-500">Encrypted session</p>
+						</div>
+					</div>
+					<div className="mt-4 space-y-2">
+						<div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+							<motion.div
+								className="h-1.5 rounded-full bg-brand-500"
+								animate={{ width: ['10%', '90%', '10%'] }}
+								transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+							/>
+						</div>
+						<div className="h-1.5 w-3/5 rounded-full bg-zinc-800" />
+					</div>
+				</motion.div>
+
+				{/* Floating "access verified" badge */}
+				<motion.div
+					className="absolute -bottom-5 -right-6 flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-zinc-900/90 px-3 py-1.5 shadow-xl"
+					animate={{ opacity: [0, 1, 1, 0], y: [8, 0, 0, -6] }}
+					transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', times: [0, 0.25, 0.8, 1] }}
+				>
+					<CheckCircle2Icon className="size-3.5 text-emerald-400" />
+					<span className="text-[10px] font-semibold text-emerald-300">Access verified</span>
+				</motion.div>
+
+				{/* Floating particles */}
+				{[0, 1, 2].map((i) => (
+					<motion.span
+						key={i}
+						className="absolute size-1.5 rounded-full bg-brand-400/70"
+						style={{ left: `${20 + i * 30}%`, top: `${-6 - i * 6}%` }}
+						animate={{ y: [0, -14, 0], opacity: [0.3, 1, 0.3] }}
+						transition={{ duration: 2.4 + i * 0.6, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}
+					/>
+				))}
+			</div>
+		</div>
+	);
+}
+
 function FloatingPaths({ position }: { position: number }) {
 	const paths = Array.from({ length: 36 }, (_, i) => ({
 		id: i,

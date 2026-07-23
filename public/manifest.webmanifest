@@ -1,0 +1,19 @@
+{
+	"name": "wrkspace",
+	"short_name": "wrkspace",
+	"description": "Employee workplace app — attendance, tasks, messages, safety",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#0047FF",
+	"theme_color": "#0047FF",
+	"icons": [
+		{
+			"src": "/icon.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any maskable"
+		}
+	]
+}

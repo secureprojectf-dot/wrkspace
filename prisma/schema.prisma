@@ -11,6 +11,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Admin {
@@ -41,6 +42,137 @@ model Employee {
   password     String?
   activeOtp    String?
   otpExpiresAt DateTime?
+  /// UNSPECIFIED | MALE | FEMALE
+  gender       String   @default("UNSPECIFIED")
+  fcmToken     String?
+  homeLat      Float?
+  homeLng      Float?
+  homePlusCode String?
+  homeAddress  String?
+  homeRadiusM  Int      @default(100)
+  /// After first save, false until admin allows a change again
+  homeEditAllowed Boolean @default(true)
+  /// Profile photo as data URL (compressed JPEG) or https URL
+  photoUrl     String?
+  /// Admin-uploaded employee ID card image (data URL or https)
+  idCardUrl    String?
+  /// Active | Inactive — set by verification-portal admins (SUPER), shown to public/company viewers.
+  employmentStatus String @default("Active")
+  /// Company-facing bio / about (used as "Resume Summary")
+  about        String?  @db.Text
+  /// Employee notes / remarks for verification companies
+  remarks      String?  @db.Text
+  /// JSON array: qualifications (legacy — superseded by `education`, kept for migration)
+  qualifications String? @db.Text
+  /// JSON array: certifications (optional fileUrl)
+  certifications String? @db.Text
+  /// JSON array: work experience
+  experience   String?  @db.Text
+  /// JSON array: projects
+  projects     String?  @db.Text
+  /// Emergency contact (EC)
+  emergencyContactName     String?
+  emergencyContactPhone    String?
+  emergencyContactRelation String?
+
+  // --- Professional profile: Personal info ---
+  professionalTitle String?
+  city         String?
+  state        String?
+  country      String?
+  linkedinUrl  String?
+  githubUrl    String?
+  portfolioUrl String?
+  leetcodeUrl  String?
+  codeforcesUrl String?
+  codechefUrl  String?
+  hackerrankUrl String?
+
+  // --- Professional profile: Summary ---
+  careerObjective   String? @db.Text
+  yearsOfExperience String?
+  industry          String?
+
+  // --- Professional profile: structured JSON sections ---
+  /// JSON array: education { id, institution, degree, specialization, cgpa, from, to }
+  education      String? @db.Text
+  /// JSON object: skills by category (programmingLanguages, frontend, backend, database, cloud, devops, tools, softSkills)
+  skills         String? @db.Text
+  /// JSON array: achievements & awards { id, title, organization, date, description }
+  achievements   String? @db.Text
+  /// JSON array: internships (like experience, no employmentType)
+  internships    String? @db.Text
+  /// JSON array: publications & research { id, title, authors, journal, conference, year, url, abstract }
+  publications   String? @db.Text
+  /// JSON array: custom sections { id, title, content }
+  customSections String? @db.Text
+  /// Last known device location (continuous while app monitors / on shift)
+  lastLat      Float?
+  lastLng      Float?
+  lastLocationAt DateTime?
+  /// Admin requested personal live tracking (independent of global)
+  liveTrackActive Boolean @default(false)
+  sosIncidents SosIncident[]
+  safetyTrips  SafetyTrip[]
+}
+
+/// Admin global live-tracking switch (start/stop all employees).
+model LiveTrackConfig {
+  id        String    @id @default("global")
+  active    Boolean   @default(false)
+  startedAt DateTime?
+  startedBy String?
+  updatedAt DateTime  @updatedAt
+}
+
+model SosIncident {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  status      String    @default("OPEN") // OPEN | RESOLVED
+  lat         Float
+  lng         Float
+  note        String?
+  createdAt   DateTime  @default(now())
+  resolvedAt  DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status])
+  @@index([employeeId])
+}
+
+model SafetyTrip {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  status      String    @default("IN_TRANSIT") // IN_TRANSIT | ARRIVED_HOME | CANCELLED
+  /// IST calendar day key YYYY-MM-DD for date-wise admin filters
+  dateKey     String?
+  lat         Float?
+  lng         Float?
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  updatedAt   DateTime  @updatedAt
+  points      SafetyTripPoint[]
+
+  @@index([status])
+  @@index([employeeId])
+  @@index([dateKey])
+  @@index([employeeId, dateKey])
+}
+
+/// Continuous GPS trail while a girl is going home (admin live + history).
+model SafetyTripPoint {
+  id         String     @id @default(uuid())
+  tripId     String
+  trip       SafetyTrip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  lat        Float
+  lng        Float
+  recordedAt DateTime   @default(now())
+
+  @@index([tripId])
+  @@index([recordedAt])
+  @@index([tripId, recordedAt])
 }
 
 model Task {
@@ -78,16 +210,40 @@ model Attendance {
   checkIn      String   // e.g. "09:00 AM"
   checkOut     String?  // e.g. "06:00 PM"
   status       String   // e.g. Present, Checked In
+  /// True after near-checkout FCM or auto check-out (dedupe reminders)
+  checkoutReminderSent Boolean @default(false)
   createdAt    DateTime @default(now())
 }
 
 model Message {
-  id           String   @id @default(uuid())
-  channel      String   // e.g. "public", "marketing", "technical", "core", or direct "dm:A:B"
-  senderId     String
-  senderName   String
-  content      String
-  createdAt    DateTime @default(now())
+  id             String            @id @default(uuid())
+  channel        String            // e.g. "public", "marketing", "technical", "core", or direct "dm:A:B"
+  senderId       String
+  senderName     String
+  content        String            @default("")
+  /// image | video | file
+  attachmentType String?
+  attachmentName String?
+  /// data URL or https URL (keep small — Vercel body limit)
+  attachmentUrl  String?           @db.Text
+  replyToId      String?
+  replyPreview   String?
+  createdAt      DateTime          @default(now())
+  editedAt       DateTime?
+  reactions      MessageReaction[]
+}
+
+model MessageReaction {
+  id        String   @id @default(uuid())
+  messageId String
+  userId    String
+  userName  String
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }
 
 model ChannelAccessRequest {
@@ -171,4 +327,62 @@ model HrCompany {
   allowed             Boolean  @default(true)     // false for crawled records awaiting approval
   assignedEmployeeId  String?  // Relates to Employee.id
   createdAt           DateTime @default(now())
+}
+
+/// Offices & QR for mobile geofence check-in (Neon — not Firebase)
+model Office {
+  id           String     @id @default(uuid())
+  name         String
+  address      String?
+  lat          Float
+  lng          Float
+  plusCode     String?
+  radiusMeters Int        @default(75)
+  geofenceM    Int        @default(300)
+  active       Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  qrs          OfficeQr[]
+}
+
+model OfficeQr {
+  id        String   @id @default(uuid())
+  officeId  String
+  label     String
+  token     String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  office    Office   @relation(fields: [officeId], references: [id], onDelete: Cascade)
+
+  @@index([officeId])
+}
+
+/// External / partner companies that use the Employee Verification portal.
+model VerificationCompany {
+  id           String                   @id @default(uuid())
+  name         String
+  contactEmail String?
+  contactPhone String?
+  notes        String?
+  active       Boolean                  @default(true)
+  createdAt    DateTime                 @default(now())
+  createdBy    String?
+  users        VerificationPortalUser[]
+}
+
+/// Logins for /employee-verification — SUPER (wrkspace) or COMPANY viewer.
+model VerificationPortalUser {
+  id          String               @id @default(uuid())
+  email       String               @unique
+  password    String
+  displayName String?
+  /// SUPER = full wrkspace directory · COMPANY = company-scoped verifier
+  role        String               @default("COMPANY")
+  companyId   String?
+  company     VerificationCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  active      Boolean              @default(true)
+  createdAt   DateTime             @default(now())
+  lastLoginAt DateTime?
+
+  @@index([companyId])
+  @@index([role])
 }

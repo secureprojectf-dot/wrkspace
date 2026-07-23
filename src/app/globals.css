@@ -87,3 +87,270 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Employee website only — soft dim light UI, high-contrast text (admin stays dark) */
+.employee-portal {
+  color-scheme: light;
+  --background: #e8edf5;
+  --foreground: #0f172a;
+  --zinc-950: #ffffff;
+  --zinc-900: #f1f5f9;
+  --zinc-850: #e2e8f0;
+  --zinc-800: #cbd5e1;
+  --zinc-750: #cbd5e1;
+  --zinc-700: #94a3b8;
+  --zinc-600: #1e293b;
+  --zinc-550: #1e293b;
+  --zinc-500: #0f172a;
+  --zinc-400: #0f172a;
+  --zinc-300: #020617;
+  --subnav-bg: linear-gradient(180deg, #f8fafc 0%, #e8eef8 100%);
+  --subnav-bg-fallback: #f1f5f9;
+  --subnav-border-color: #94a3b8;
+  --subnav-border-active: #4f39f5;
+  --subnav-text-active: #1e1b4b;
+  --subnav-text-inactive: #1e293b;
+  --subnav-text-hover: #020617;
+  background: #e8edf5 !important;
+  color: #0f172a !important;
+  font-size: 15.5px;
+}
+
+/* Full wordmark logo (icon + wrkspace text baked in) */
+.employee-portal .emp-logo-mark {
+  height: 2.25rem;
+  width: auto;
+  max-width: 11rem;
+  object-fit: contain;
+  object-position: left center;
+  flex-shrink: 0;
+}
+
+/* Messages channel pills — white label on solid active color */
+.employee-portal button.channel-pill-active,
+.employee-portal button.channel-pill-active * {
+  color: #ffffff !important;
+}
+
+/* Cards / panels stay white for contrast on dim page */
+.employee-portal .bg-zinc-900\/30,
+.employee-portal .bg-zinc-900\/40,
+.employee-portal .bg-zinc-900\/20,
+.employee-portal .bg-zinc-950\/40,
+.employee-portal .bg-zinc-950 {
+  background-color: #ffffff !important;
+}
+
+/* Tiny labels → bigger + slate (not ash) */
+.employee-portal .text-\[9px\] {
+  font-size: 12px !important;
+  color: #1e293b !important;
+  font-weight: 600;
+}
+.employee-portal .text-\[10px\] {
+  font-size: 12.5px !important;
+  color: #1e293b !important;
+  font-weight: 600;
+}
+.employee-portal .text-xs {
+  font-size: 13.5px !important;
+  line-height: 1.5;
+  color: #0f172a;
+}
+.employee-portal .text-sm {
+  font-size: 15px !important;
+  line-height: 1.55;
+  color: #0f172a;
+}
+
+/* Kill ashy muted text — force readable slate/black */
+.employee-portal .text-zinc-400,
+.employee-portal .text-zinc-450,
+.employee-portal .text-zinc-500,
+.employee-portal .text-zinc-550,
+.employee-portal .text-zinc-600,
+.employee-portal .text-zinc-650,
+.employee-portal .text-muted-foreground,
+.employee-portal .text-zinc-300,
+.employee-portal .text-zinc-200,
+.employee-portal .text-zinc-100,
+.employee-portal .text-foreground,
+.employee-portal .text-white {
+  color: #0f172a !important;
+}
+
+.employee-portal .text-brand-400,
+.employee-portal .text-brand-500 {
+  color: #4f39f5 !important;
+}
+
+/* Keep white text only on solid action buttons */
+.employee-portal .bg-emerald-600,
+.employee-portal .bg-emerald-500,
+.employee-portal .bg-red-600,
+.employee-portal .bg-red-500,
+.employee-portal .bg-brand-600,
+.employee-portal .bg-brand-700,
+.employee-portal .bg-brand-500,
+.employee-portal .bg-indigo-600,
+.employee-portal .bg-indigo-650,
+.employee-portal [class*="bg-emerald-6"],
+.employee-portal [class*="bg-red-6"],
+.employee-portal [class*="bg-brand-6"],
+.employee-portal [class*="bg-brand-5"],
+.employee-portal [class*="bg-brand-7"] {
+  color: #ffffff !important;
+}
+.employee-portal .bg-emerald-600 *,
+.employee-portal .bg-emerald-500 *,
+.employee-portal .bg-red-600 *,
+.employee-portal .bg-red-500 *,
+.employee-portal .bg-brand-600 *,
+.employee-portal .bg-brand-700 *,
+.employee-portal .bg-brand-500 *,
+.employee-portal .bg-indigo-600 * {
+  color: #ffffff !important;
+}
+
+.employee-portal .hover\:bg-indigo-600:hover,
+.employee-portal .hover\:bg-emerald-500:hover,
+.employee-portal .hover\:bg-red-500:hover,
+.employee-portal .hover\:bg-brand-500:hover,
+.employee-portal .hover\:bg-brand-600:hover {
+  color: #ffffff !important;
+}
+
+/* Header / nav bars */
+.employee-portal > header {
+  background: #f8fafc !important;
+  border-bottom: 1px solid #94a3b8 !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.employee-portal button.border,
+.employee-portal a.border {
+  border-color: #475569 !important;
+  color: #0f172a !important;
+  background: #ffffff !important;
+  font-weight: 600;
+}
+.employee-portal button.border:hover {
+  border-color: #0f172a !important;
+  background: #e2e8f0 !important;
+  color: #020617 !important;
+}
+
+.employee-portal input,
+.employee-portal select,
+.employee-portal textarea {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  border-color: #64748b !important;
+  font-size: 14.5px;
+}
+
+.employee-portal input::placeholder,
+.employee-portal textarea::placeholder {
+  color: #475569 !important;
+  opacity: 1;
+}
+
+.employee-portal .placeholder\:text-zinc-600::placeholder,
+.employee-portal .placeholder\:text-zinc-700::placeholder,
+.employee-portal .placeholder\:text-zinc-500::placeholder {
+  color: #475569 !important;
+}
+
+.employee-portal .bg-indigo-950\/40 {
+  background-color: #e0e7ff !important;
+}
+
+.employee-portal .text-indigo-300 {
+  color: #312e81 !important;
+}
+
+.employee-portal .border-indigo-800 {
+  border-color: #818cf8 !important;
+}
+
+/* Messages sidebar role badges — keep high contrast on light portal */
+.employee-portal .bg-indigo-600.text-white {
+  background-color: #4f46e5 !important;
+  color: #ffffff !important;
+}
+.employee-portal .bg-slate-200.text-slate-800 {
+  background-color: #e2e8f0 !important;
+  color: #1e293b !important;
+}
+
+.employee-portal h1,
+.employee-portal h2,
+.employee-portal h3,
+.employee-portal h4,
+.employee-portal p,
+.employee-portal td,
+.employee-portal th,
+.employee-portal label,
+.employee-portal li {
+  color: #0f172a;
+}
+
+.employee-portal table {
+  color: #0f172a;
+}
+
+/* Soft page wash (less glare than pure white) */
+.employee-portal > .absolute.inset-0 {
+  background: radial-gradient(circle at top, rgba(79, 57, 245, 0.07), transparent 50%) !important;
+}
+
+/* Flutter-parity mobile web shell */
+.mobile-flutter-shell {
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: normal;
+}
+
+.mobile-flutter-shell,
+.mobile-flutter-shell button,
+.mobile-flutter-shell input,
+.mobile-flutter-shell textarea,
+.mobile-flutter-shell p,
+.mobile-flutter-shell span,
+.mobile-flutter-shell h1,
+.mobile-flutter-shell h2,
+.mobile-flutter-shell h3 {
+  font-family: inherit !important;
+}
+
+.mobile-messages-wrap > div {
+  height: 100% !important;
+  max-width: 100% !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Light Flutter-like More feature panels (EmployeeDashboard embed) */
+.emp-mobile-panel .employee-portal {
+  background: #f0f3ff !important;
+  min-height: 0 !important;
+}
+.emp-mobile-panel .text-white {
+  color: #0f172a !important;
+}
+.emp-mobile-panel .bg-zinc-950,
+.emp-mobile-panel .bg-zinc-950\/40 {
+  background-color: #f8fafc !important;
+}
+.emp-mobile-panel input,
+.emp-mobile-panel textarea,
+.emp-mobile-panel select {
+  color: #0f172a !important;
+}
+
+#wrkspace-qr-reader video {
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+}

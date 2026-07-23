@@ -13,182 +13,189 @@ export default function EventTicketPage() {
 	const [loading, setLoading] = useState(true);
 
 	useEffect(() => {
-		// Load session from localStorage
 		try {
 			const saved = localStorage.getItem('wrkspace_employee_session');
-			if (saved) {
-				setEmployee(JSON.parse(saved));
-			}
+			if (saved) setEmployee(JSON.parse(saved));
 		} catch (e) {
 			console.error('Failed to load employee session', e);
 		}
 
-		// Load event from DB
 		const loadEvent = async () => {
 			if (params.id) {
-				const data = await getEventById(params.id as string);
+				let empId: string | undefined;
+				try {
+					const saved = localStorage.getItem('wrkspace_employee_session');
+					if (saved) empId = JSON.parse(saved)?.id;
+				} catch (_) {}
+				const data = await getEventById(params.id as string, empId);
 				setEvent(data);
 			}
 			setLoading(false);
 		};
-
 		loadEvent();
 	}, [params.id]);
 
 	if (loading) {
 		return (
-			<div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-500 font-mono text-xs">
-				LOADING TICKET REFERENCE PASS...
+			<div className="employee-portal min-h-screen bg-[#e8edf5] flex items-center justify-center text-slate-700 font-mono text-sm font-semibold">
+				Loading event pass…
 			</div>
 		);
 	}
 
 	if (!event) {
 		return (
-			<div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4 text-center p-6">
-				<CalendarIcon className="size-12 text-zinc-800" />
-				<h1 className="text-white text-lg font-bold">Event Not Found</h1>
-				<p className="text-zinc-500 text-sm max-w-xs">The event you are trying to view does not exist or has been deleted.</p>
-				<button 
-					onClick={() => window.close()}
-					className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold px-4 py-2 text-white cursor-pointer"
+			<div className="employee-portal min-h-screen bg-[#e8edf5] flex flex-col items-center justify-center gap-4 text-center p-6">
+				<CalendarIcon className="size-12 text-slate-400" />
+				<h1 className="text-slate-900 text-lg font-bold">Event Not Found</h1>
+				<p className="text-slate-700 text-sm max-w-xs">This event is not available, or you are not listed as a representative for it.</p>
+				<button
+					onClick={() => {
+						if (window.opener) window.close();
+						else router.push('/');
+					}}
+					className="bg-white hover:bg-slate-100 border border-slate-500 text-sm font-semibold px-4 py-2 text-slate-900 cursor-pointer"
 				>
-					Close Window
+					Back to portal
 				</button>
 			</div>
 		);
 	}
 
-	const reps: { id: string; name: string }[] = JSON.parse(event.representatives || '[]');
+	const reps: { id: string; name: string }[] = (() => {
+		try {
+			return JSON.parse(event.representatives || '[]');
+		} catch {
+			return [];
+		}
+	})();
 	const startD = new Date(event.startDate);
 	const endD = new Date(event.endDate);
 	const fmt = (d: Date) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
 	return (
-		<div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-brand-900/60 p-4 md:p-8 flex flex-col items-center justify-center">
-			
-			{/* Top Header Controls */}
-			<div className="w-full max-w-2xl flex items-center justify-between mb-6 pb-4 border-b border-zinc-800/80">
-				<button 
+		<div className="employee-portal min-h-screen bg-[#e8edf5] text-slate-900 font-sans selection:bg-brand-200 p-4 md:p-8 flex flex-col items-center justify-center">
+			<div className="w-full max-w-2xl flex items-center justify-between mb-6 pb-4 border-b border-slate-300">
+				<button
 					onClick={() => {
-						if (window.opener) {
-							window.close();
-						} else {
-							router.back();
-						}
+						if (window.opener) window.close();
+						else router.push('/');
 					}}
-					className="flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors cursor-pointer font-semibold font-mono"
+					className="flex items-center gap-2 text-sm text-slate-800 hover:text-black transition-colors cursor-pointer font-bold"
 				>
-					<ArrowLeftIcon className="size-3.5" />
-					BACK TO PORTAL
+					<ArrowLeftIcon className="size-4" />
+					Back to portal
 				</button>
 
-				<div className="flex items-center gap-3">
-					<img src="https://ik.imagekit.io/dypkhqxip/logogog" alt="WrkSpace Logo" className="h-6 w-auto object-contain" />
-					<span className="text-[10px] text-zinc-550 font-mono tracking-widest uppercase font-bold">WRKSPACE PORTAL</span>
-				</div>
+				<img
+					src="/branding/wrkspace-logo.png?v=20260717b"
+					alt="wrkspace"
+					className="emp-logo-mark"
+				/>
 			</div>
 
-			{/* Main Ticket Layout */}
-			<div className="w-full max-w-2xl bg-zinc-900 border border-zinc-800 shadow-2xl relative flex flex-col md:flex-row overflow-hidden">
-				
-				{/* Ticket Cutouts for folding aesthetics */}
-				<div className="absolute top-1/2 -left-3 -translate-y-1/2 size-6 rounded-full bg-zinc-950 border border-zinc-800 hidden md:block" />
-				<div className="absolute top-1/2 -right-3 -translate-y-1/2 size-6 rounded-full bg-zinc-950 border border-zinc-800 hidden md:block" />
+			<div className="w-full max-w-2xl bg-white border border-slate-300 shadow-lg relative flex flex-col md:flex-row overflow-hidden">
+				<div className="absolute top-1/2 -left-3 -translate-y-1/2 size-6 rounded-full bg-[#e8edf5] border border-slate-300 hidden md:block" />
+				<div className="absolute top-1/2 -right-3 -translate-y-1/2 size-6 rounded-full bg-[#e8edf5] border border-slate-300 hidden md:block" />
 
-				{/* Left Column: Image Banner (Flex adjust / Object Contain) */}
-				<div className="w-full md:w-2/5 h-64 md:h-auto bg-zinc-950 flex items-center justify-center border-b md:border-b-0 md:border-r border-zinc-800 relative">
+				<div className="w-full md:w-2/5 h-64 md:h-auto bg-slate-100 flex items-center justify-center border-b md:border-b-0 md:border-r border-slate-300 relative">
 					{event.imageUrl ? (
-						<img 
-							src={event.imageUrl} 
-							alt={event.title} 
-							className="w-full h-full object-contain" 
-						/>
+						<img src={event.imageUrl} alt={event.title} className="w-full h-full object-contain" />
 					) : (
-						<div className="absolute inset-0 bg-gradient-to-br from-indigo-950 via-zinc-900/40 to-black flex items-center justify-center">
-							<CalendarIcon className="size-16 text-brand-500/10" />
+						<div className="absolute inset-0 bg-gradient-to-br from-indigo-100 via-slate-50 to-white flex items-center justify-center">
+							<CalendarIcon className="size-16 text-brand-500/30" />
 						</div>
 					)}
-					<div className="absolute bottom-3 left-3 bg-black/85 backdrop-blur-sm px-2 py-0.5 border border-zinc-800 text-[9px] font-mono text-brand-400 uppercase tracking-widest">
+					<div className="absolute bottom-3 left-3 bg-white/95 px-2 py-0.5 border border-slate-300 text-[11px] font-mono text-brand-600 uppercase tracking-widest font-bold">
 						{event.source || 'Event'}
 					</div>
 				</div>
 
-				{/* Right Column: Ticket Body */}
 				<div className="w-full md:w-3/5 p-6 flex flex-col justify-between space-y-6">
-					
 					<div className="space-y-4">
-						{/* Digital ID Pass Card */}
 						{employee && (
-							<div className="border border-dashed border-zinc-700 bg-zinc-950/60 p-4 font-mono space-y-2.5 text-center relative overflow-hidden">
-								<div className="absolute -left-2 top-1/2 -translate-y-1/2 size-4 rounded-full bg-zinc-900 border border-zinc-800" />
-								<div className="absolute -right-2 top-1/2 -translate-y-1/2 size-4 rounded-full bg-zinc-900 border border-zinc-800" />
-								
-								{/* Ticket Image inside Digital ID */}
+							<div className="border border-dashed border-slate-400 bg-slate-50 p-4 font-mono space-y-2.5 text-center relative overflow-hidden">
 								{event.imageUrl && (
-									<div className="w-full h-16 overflow-hidden relative border border-zinc-800/80 mb-2 shrink-0 bg-zinc-950">
-										<img 
-											src={event.imageUrl} 
-											alt={event.title} 
-											className="h-full w-full object-contain opacity-90" 
-										/>
+									<div className="w-full h-16 overflow-hidden relative border border-slate-300 mb-2 shrink-0 bg-white">
+										<img src={event.imageUrl} alt={event.title} className="h-full w-full object-contain" />
 									</div>
 								)}
-
-								<span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold block">Official Reference Pass</span>
-								<strong className="text-white text-xs md:text-sm tracking-wider block font-bold truncate">
+								<span className="text-[11px] text-slate-700 uppercase tracking-widest font-bold block">Official Reference Pass</span>
+								{employee.photoUrl ? (
+									// eslint-disable-next-line @next/next/no-img-element
+									<img
+										src={employee.photoUrl}
+										alt=""
+										className="mx-auto size-16 rounded-full object-cover border-2 border-indigo-300 bg-white"
+									/>
+								) : (
+									<div className="mx-auto size-16 rounded-full bg-indigo-100 border-2 border-indigo-300 flex items-center justify-center text-indigo-800 font-black text-lg">
+										{(employee.firstName?.[0] || 'E').toUpperCase()}
+										{(employee.lastName?.[0] || '').toUpperCase()}
+									</div>
+								)}
+								<strong className="text-slate-900 text-xs md:text-sm tracking-wider block font-bold truncate">
 									EVT-REG-{event.id.slice(0, 8).toUpperCase()}-{employee.id.toUpperCase()}
 								</strong>
-								<span className="text-[9px] text-zinc-500 block">Assigned Employee: {employee.firstName} {employee.lastName}</span>
+								<span className="text-[11px] text-slate-700 block font-semibold">
+									Assigned Employee: {employee.firstName} {employee.lastName}
+								</span>
 							</div>
 						)}
 
-						{/* Event Metadata */}
 						<div className="space-y-1">
-							<span className="text-[9px] text-brand-400 font-bold uppercase tracking-widest font-mono block">{event.organisingCollege}</span>
-							<h1 className="text-xl font-black text-white leading-tight">{event.title}</h1>
+							<span className="text-[11px] text-brand-600 font-bold uppercase tracking-widest font-mono block">
+								{event.organisingCollege}
+							</span>
+							<h1 className="text-xl font-black text-slate-900 leading-tight">{event.title}</h1>
 						</div>
 
-						{/* Description */}
-						<div className="space-y-1 text-xs">
-							<span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider font-mono block">Details</span>
-							<p className="text-zinc-400 leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-zinc-800">
+						<div className="space-y-1 text-sm">
+							<span className="text-[11px] text-slate-700 font-bold uppercase tracking-wider font-mono block">Details</span>
+							<p className="text-slate-800 leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto pr-1">
 								{event.description}
 							</p>
 						</div>
 
-						{/* Timings & Venue Grid */}
-						<div className="grid grid-cols-1 gap-2 pt-3 border-t border-zinc-800/60 text-xs">
+						<div className="grid grid-cols-1 gap-2 pt-3 border-t border-slate-200 text-sm">
 							<div className="flex items-start justify-between gap-4">
-								<span className="text-zinc-500 font-medium shrink-0 font-mono text-[9px] uppercase tracking-wider">Schedule</span>
-								<div className="text-right text-zinc-300">
-									<p>{fmt(startD)} · {event.startTime}</p>
-									<p className="text-[10px] text-zinc-500">to {fmt(endD)} · {event.endTime}</p>
+								<span className="text-slate-700 font-bold shrink-0 font-mono text-[11px] uppercase tracking-wider">Schedule</span>
+								<div className="text-right text-slate-900 font-semibold">
+									<p>
+										{fmt(startD)} · {event.startTime}
+									</p>
+									<p className="text-xs text-slate-700">
+										to {fmt(endD)} · {event.endTime}
+									</p>
 								</div>
 							</div>
 							<div className="flex items-start justify-between gap-4 pt-1">
-								<span className="text-zinc-500 font-medium shrink-0 font-mono text-[9px] uppercase tracking-wider">Venue</span>
-								<p className="text-right text-zinc-350 leading-tight max-w-[200px] flex items-center gap-1 justify-end">
-									<MapPinIcon className="size-3.5 text-zinc-500 shrink-0 inline" />
+								<span className="text-slate-700 font-bold shrink-0 font-mono text-[11px] uppercase tracking-wider">Venue</span>
+								<p className="text-right text-slate-900 leading-tight max-w-[200px] flex items-center gap-1 justify-end font-semibold">
+									<MapPinIcon className="size-3.5 text-slate-600 shrink-0 inline" />
 									{event.venueAddress}
 								</p>
 							</div>
 						</div>
 
-						{/* Representatives */}
 						{reps.length > 0 && (
-							<div className="space-y-1.5 pt-3 border-t border-zinc-800/60">
-								<span className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider font-mono block">Assigned Representatives</span>
+							<div className="space-y-1.5 pt-3 border-t border-slate-200">
+								<span className="text-[11px] text-slate-700 font-bold uppercase tracking-wider font-mono block">
+									Assigned Representatives
+								</span>
 								<div className="flex flex-wrap gap-1.5">
 									{reps.map((r, i) => (
-										<span key={i} className={`text-[10px] px-2 py-0.5 border ${
-											employee && r.name === `${employee.firstName} ${employee.lastName}`
-												? 'bg-brand-950/40 border-brand-900/40 text-brand-300'
-												: 'bg-zinc-950 border-zinc-800 text-zinc-400'
-										}`}>
+										<span
+											key={i}
+											className={`text-[11px] px-2 py-0.5 border font-semibold ${
+												employee && r.name === `${employee.firstName} ${employee.lastName}`
+													? 'bg-indigo-50 border-indigo-300 text-indigo-900'
+													: 'bg-slate-50 border-slate-300 text-slate-800'
+											}`}
+										>
 											{r.name}
 											{employee && r.name === `${employee.firstName} ${employee.lastName}` && (
-												<span className="ml-1 text-brand-400 font-bold">· You</span>
+												<span className="ml-1 text-brand-600 font-bold">· You</span>
 											)}
 										</span>
 									))}
@@ -197,17 +204,15 @@ export default function EventTicketPage() {
 						)}
 					</div>
 
-					{/* Action Buttons */}
-					<div className="flex items-center gap-3 pt-3 border-t border-zinc-800">
-						<button 
+					<div className="flex items-center gap-3 pt-3 border-t border-slate-200">
+						<button
 							onClick={() => window.print()}
-							className="flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold px-4 py-2.5 rounded-none cursor-pointer transition-colors w-full font-mono"
+							className="flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-bold px-4 py-2.5 rounded-none cursor-pointer transition-colors w-full"
 						>
-							<PrinterIcon className="size-3.5" />
-							PRINT / PDF PASS
+							<PrinterIcon className="size-4" />
+							Print / PDF pass
 						</button>
 					</div>
-
 				</div>
 			</div>
 		</div>
